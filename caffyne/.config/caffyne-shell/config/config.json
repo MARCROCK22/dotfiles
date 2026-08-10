@@ -11,8 +11,8 @@
         "monitor": 0,
         "bars": [
           {
-            "alignment": "bottom",
-            "floating_bar": false,
+            "alignment": "top",
+            "floating_bar": true,
             "floating_applets": true,
             "rounded_edges": true,
             "min_width": false,
@@ -30,9 +30,7 @@
               "Weather",
               "Media"
             ],
-            "center": [
-              "Dock"
-            ],
+            "center": [],
             "right": [
               "Tray",
               "Calendar",
@@ -46,17 +44,30 @@
               },
               "Notifications"
             ]
+          },
+          {
+            "alignment": "bottom",
+            "floating_bar": true,
+            "floating_applets": false,
+            "rounded_edges": true,
+            "min_width": true,
+            "auto_hide": false,
+            "left": [],
+            "center": [
+              "Dock"
+            ],
+            "right": []
           }
         ],
-        "alignment": "bottom",
+        "alignment": "top",
         "floating_bar": true
       },
       {
         "monitor": 1,
         "bars": [
           {
-            "alignment": "bottom",
-            "floating_bar": false,
+            "alignment": "top",
+            "floating_bar": true,
             "floating_applets": true,
             "rounded_edges": true,
             "min_width": false,
@@ -74,9 +85,7 @@
               "Weather",
               "Media"
             ],
-            "center": [
-              "Dock"
-            ],
+            "center": [],
             "right": [
               "Tray",
               "Calendar",
@@ -90,9 +99,22 @@
               },
               "Notifications"
             ]
+          },
+          {
+            "alignment": "bottom",
+            "floating_bar": true,
+            "floating_applets": false,
+            "rounded_edges": true,
+            "min_width": true,
+            "auto_hide": false,
+            "left": [],
+            "center": [
+              "Dock"
+            ],
+            "right": []
           }
         ],
-        "alignment": "bottom",
+        "alignment": "top",
         "floating_bar": true
       }
     ]
@@ -121,7 +143,7 @@
   },
   "theme": {
     "light_theme": "catppuccin-latte",
-    "dark_theme": "ros\u00e9-pine",
+    "dark_theme": "ros\u00c3\u00a9-pine",
     "active_accent": "accent4",
     "is_dark": true,
     "scheme_type": "scheme-tonal-spot",
@@ -173,7 +195,7 @@
         {
           "key": "Energy",
           "grid_x": 9,
-          "grid_y": 8,
+          "grid_y": 7,
           "ax": "center",
           "dx": -1,
           "ry": 0.8
