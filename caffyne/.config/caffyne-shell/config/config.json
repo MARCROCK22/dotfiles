@@ -1,0 +1,192 @@
+{
+  "user": {
+    "avatar": "/var/lib/AccountsService/icons/marcrock"
+  },
+  "settings": {
+    "dnd": false
+  },
+  "bars": {
+    "configs": [
+      {
+        "monitor": 0,
+        "bars": [
+          {
+            "alignment": "bottom",
+            "floating_bar": false,
+            "floating_applets": true,
+            "rounded_edges": true,
+            "min_width": false,
+            "auto_hide": false,
+            "left": [
+              "Dash",
+              {
+                "widget": "Launcher",
+                "variant": "icon"
+              },
+              {
+                "widget": "Processes",
+                "variant": "scale"
+              },
+              "Weather",
+              "Media"
+            ],
+            "center": [
+              "Dock"
+            ],
+            "right": [
+              "Tray",
+              "Calendar",
+              {
+                "widget": "Clock",
+                "variant": "icon+label"
+              },
+              {
+                "widget": "Settings",
+                "variant": "single"
+              },
+              "Notifications"
+            ]
+          }
+        ],
+        "alignment": "bottom",
+        "floating_bar": true
+      },
+      {
+        "monitor": 1,
+        "bars": [
+          {
+            "alignment": "bottom",
+            "floating_bar": false,
+            "floating_applets": true,
+            "rounded_edges": true,
+            "min_width": false,
+            "auto_hide": false,
+            "left": [
+              "Dash",
+              {
+                "widget": "Launcher",
+                "variant": "icon"
+              },
+              {
+                "widget": "Processes",
+                "variant": "scale"
+              },
+              "Weather",
+              "Media"
+            ],
+            "center": [
+              "Dock"
+            ],
+            "right": [
+              "Tray",
+              "Calendar",
+              {
+                "widget": "Clock",
+                "variant": "icon+label"
+              },
+              {
+                "widget": "Settings",
+                "variant": "single"
+              },
+              "Notifications"
+            ]
+          }
+        ],
+        "alignment": "bottom",
+        "floating_bar": true
+      }
+    ]
+  },
+  "timeouts": {
+    "list": [
+      {
+        "name": "screen-off",
+        "timeout_ac": 10,
+        "timeout_bat": 2,
+        "enabled": true
+      },
+      {
+        "name": "lock",
+        "timeout_ac": 15,
+        "timeout_bat": 5,
+        "enabled": true
+      },
+      {
+        "name": "suspend",
+        "timeout_ac": 15,
+        "timeout_bat": 10,
+        "enabled": true
+      }
+    ]
+  },
+  "theme": {
+    "light_theme": "catppuccin-latte",
+    "dark_theme": "ros\u00e9-pine",
+    "active_accent": "accent4",
+    "is_dark": true,
+    "scheme_type": "scheme-tonal-spot",
+    "opacity": 1.0,
+    "blur": true,
+    "border_style": "medium",
+    "font_monospace_style": "none"
+  },
+  "launcher": {
+    "grid": false
+  },
+  "dock": {
+    "entries": []
+  },
+  "world_clocks": {
+    "clocks": [
+      "Europe/London",
+      "Europe/Paris"
+    ]
+  },
+  "wallpaper": {
+    "path": "/home/marcrock/.config/caffyne-shell/wallpapers/rain_world.png"
+  },
+  "templates": {
+    "enabled": []
+  },
+  "desktop_applets": {
+    "applets": []
+  },
+  "desktop_canvas": {
+    "placements": {
+      "0": [
+        {
+          "key": "Processes",
+          "grid_x": 18,
+          "grid_y": 0,
+          "ax": "right",
+          "dx": 0,
+          "ry": 0.0
+        },
+        {
+          "key": "Calendar",
+          "grid_x": 0,
+          "grid_y": 0,
+          "ax": "left",
+          "dx": 0,
+          "ry": 0.0
+        },
+        {
+          "key": "Energy",
+          "grid_x": 9,
+          "grid_y": 8,
+          "ax": "center",
+          "dx": -1,
+          "ry": 0.8
+        },
+        {
+          "key": "Clock",
+          "grid_x": 9,
+          "grid_y": 0,
+          "ax": "center",
+          "dx": -1,
+          "ry": 0.0
+        }
+      ]
+    }
+  }
+}

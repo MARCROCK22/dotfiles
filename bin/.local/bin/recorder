@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+OUT_DIR="$HOME/Vídeos/wf-recorder"
+mkdir -p "$OUT_DIR"
+
+if pgrep -x wf-recorder >/dev/null; then
+    pkill -INT -x wf-recorder
+    notify-send "Stopped recording" "Saved in $OUT_DIR"
+    exit 0
+fi
+
+MODE=$(printf 'Full screen\nArea' | fuzzel --dmenu -p 'Record: ') || exit 0
+
+FILE="$OUT_DIR/rec-$(date +%Y%m%d-%H%M%S).mp4"
+AUDIO="$(pactl get-default-sink).monitor"
+
+if [ "$MODE" = "Area" ]; then
+    GEOM=$(slurp) || exit 0
+    wf-recorder -g "$GEOM" --audio="$AUDIO" -C aac -f "$FILE" &
+else
+    wf-recorder --audio="$AUDIO" -C aac -f "$FILE" &
+fi
+
+notify-send "Recording" "$(basename "$FILE")"

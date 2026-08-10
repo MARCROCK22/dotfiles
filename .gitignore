@@ -1,0 +1,13 @@
+# Específico de cada máquina: nunca se comparte
+machine.kdl
+
+# Estadísticas de uso, cambian solas
+launcher_usage.json
+
+# Variables universales de fish: las genera fish y cambian constantemente
+fish_variables
+
+# Ruido
+*.log
+*.bak
+.cache/

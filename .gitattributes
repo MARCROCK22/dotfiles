@@ -1,0 +1,14 @@
+# Finales de linea LF siempre, incluso si alguien clona o edita desde Windows.
+# Sin esto, git convierte los .sh a CRLF y dejan de ejecutarse en Linux:
+#   bash: ./script.sh: /usr/bin/env: 'bash\r': No such file or directory
+* text=auto eol=lf
+
+# Binarios: git no debe tocarlos
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.mp4  binary
+*.ttf  binary
+*.otf  binary
