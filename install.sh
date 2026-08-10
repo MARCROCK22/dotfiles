@@ -12,7 +12,7 @@ echo "      sudo pacman -S --needed - < pkglist.txt"
 
 echo "==> Enlazando configuración de usuario con stow"
 command -v stow >/dev/null || { echo "Falta stow: sudo pacman -S stow"; exit 1; }
-stow niri hypr alacritty bin caffyne spicetify fish fastfetch
+stow niri hypr alacritty bin caffyne spicetify fish fastfetch starship
 
 echo "==> Archivos de sistema (sudo)"
 if [ -f system/nvidia/50-limit-free-buffer-pool-in-wayland-compositors.json ]; then

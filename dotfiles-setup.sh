@@ -13,7 +13,7 @@
 
 set -uo pipefail
 
-VERSION="5"
+VERSION="6"
 DOTS="$HOME/dotfiles"
 ESTE="$(readlink -f "${BASH_SOURCE[0]}")"
 FALTANTES=()
@@ -101,7 +101,7 @@ fi
 say "Preparando estructura"
 mkdir -p "$DOTS"/{niri/.config/niri,hypr/.config/hypr,alacritty/.config/alacritty}
 mkdir -p "$DOTS"/{bin/.local/bin,caffyne/.config/caffyne-shell/config,spicetify/.config}
-mkdir -p "$DOTS"/{fish/.config/fish,fastfetch/.config/fastfetch}
+mkdir -p "$DOTS"/{fish/.config/fish,fastfetch/.config/fastfetch,starship/.config}
 mkdir -p "$DOTS"/{system/nvidia,system/sddm,wallpaper}
 ok "directorios listos"
 
@@ -120,6 +120,7 @@ copiar_opcional "$HOME/.config/fish/conf.d"      "$DOTS/fish/.config/fish" "fish
 # arrastrar rutas, tokens de extensiones y configuracion de trabajo.
 copiar "$HOME/.config/spicetify"                  "$DOTS/spicetify/.config"           "spicetify"
 copiar "$HOME/.config/fastfetch/config.jsonc"     "$DOTS/fastfetch/.config/fastfetch" "fastfetch"
+copiar "$HOME/.config/starship.toml"              "$DOTS/starship/.config"            "starship (prompt)"
 
 # Caffyne: solo config.json, que vive en el subdirectorio config/.
 # Se excluyen a propósito:
@@ -200,7 +201,7 @@ echo "      sudo pacman -S --needed - < pkglist.txt"
 
 echo "==> Enlazando configuración de usuario con stow"
 command -v stow >/dev/null || { echo "Falta stow: sudo pacman -S stow"; exit 1; }
-stow niri hypr alacritty bin caffyne spicetify fish fastfetch
+stow niri hypr alacritty bin caffyne spicetify fish fastfetch starship
 
 echo "==> Archivos de sistema (sudo)"
 if [ -f system/nvidia/50-limit-free-buffer-pool-in-wayland-compositors.json ]; then
