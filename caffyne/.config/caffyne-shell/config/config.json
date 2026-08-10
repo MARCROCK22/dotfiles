@@ -23,17 +23,20 @@
                 "widget": "Launcher",
                 "variant": "icon"
               },
-              {
-                "widget": "Processes",
-                "variant": "scale"
-              },
-              "Weather",
+              "Focused",
               "Media"
             ],
-            "center": [],
+            "center": [
+              "Workspaces"
+            ],
             "right": [
+              "Weather",
+              "Wifi",
+              "Bluetooth",
+              "Volume",
+              "Brightness",
+              "Energy",
               "Tray",
-              "Calendar",
               {
                 "widget": "Clock",
                 "variant": "icon+label"
@@ -42,7 +45,8 @@
                 "widget": "Settings",
                 "variant": "single"
               },
-              "Notifications"
+              "Notifications",
+              "Session"
             ]
           },
           {
@@ -78,17 +82,20 @@
                 "widget": "Launcher",
                 "variant": "icon"
               },
-              {
-                "widget": "Processes",
-                "variant": "scale"
-              },
-              "Weather",
+              "Focused",
               "Media"
             ],
-            "center": [],
+            "center": [
+              "Workspaces"
+            ],
             "right": [
+              "Weather",
+              "Wifi",
+              "Bluetooth",
+              "Volume",
+              "Brightness",
+              "Energy",
               "Tray",
-              "Calendar",
               {
                 "widget": "Clock",
                 "variant": "icon+label"
@@ -97,7 +104,8 @@
                 "widget": "Settings",
                 "variant": "single"
               },
-              "Notifications"
+              "Notifications",
+              "Session"
             ]
           },
           {
@@ -193,20 +201,12 @@
           "ry": 0.0
         },
         {
-          "key": "Energy",
-          "grid_x": 9,
-          "grid_y": 7,
-          "ax": "center",
-          "dx": -1,
-          "ry": 0.8
-        },
-        {
           "key": "Clock",
           "grid_x": 9,
-          "grid_y": 0,
+          "grid_y": 3,
           "ax": "center",
           "dx": -1,
-          "ry": 0.0
+          "ry": 0.3333333333333333
         }
       ]
     }
