@@ -15,39 +15,64 @@
             "floating_bar": true,
             "floating_applets": true,
             "rounded_edges": true,
-            "min_width": false,
+            "min_width": true,
             "auto_hide": false,
-            "left": [
-              "Dash",
-              {
-                "widget": "Launcher",
-                "variant": "icon"
-              },
-              "Focused",
-              "Media"
-            ],
+            "left": [],
             "center": [
-              "Workspaces"
-            ],
-            "right": [
-              "Weather",
-              "Wifi",
-              "Bluetooth",
-              "Volume",
-              "Brightness",
-              "Energy",
-              "Tray",
               {
-                "widget": "Clock",
-                "variant": "icon+label"
+                "type": "group",
+                "widgets": [
+                  {
+                    "widget": "Dash",
+                    "variant": "icon+label"
+                  },
+                  {
+                    "widget": "Launcher",
+                    "variant": "icon"
+                  }
+                ]
+              },
+              "Workspaces",
+              {
+                "type": "group",
+                "widgets": [
+                  "Weather",
+                  {
+                    "widget": "Clock",
+                    "variant": "icon+label"
+                  }
+                ]
               },
               {
-                "widget": "Settings",
-                "variant": "single"
+                "type": "group",
+                "widgets": [
+                  {
+                    "widget": "Wifi",
+                    "variant": "icon"
+                  },
+                  "Bluetooth"
+                ]
               },
-              "Notifications",
+              {
+                "type": "group",
+                "widgets": [
+                  {
+                    "widget": "Settings",
+                    "variant": "single"
+                  },
+                  {
+                    "widget": "Notifications",
+                    "variant": "icon"
+                  }
+                ]
+              },
+              {
+                "widget": "Energy",
+                "variant": "scale+label"
+              },
               "Session"
-            ]
+            ],
+            "right": []
           },
           {
             "alignment": "bottom",
@@ -74,39 +99,52 @@
             "floating_bar": true,
             "floating_applets": true,
             "rounded_edges": true,
-            "min_width": false,
+            "min_width": true,
             "auto_hide": false,
-            "left": [
-              "Dash",
-              {
-                "widget": "Launcher",
-                "variant": "icon"
-              },
-              "Focused",
-              "Media"
-            ],
+            "left": [],
             "center": [
-              "Workspaces"
-            ],
-            "right": [
-              "Weather",
-              "Wifi",
-              "Bluetooth",
-              "Volume",
-              "Brightness",
+              {
+                "type": "group",
+                "widgets": [
+                  "Dash",
+                  {
+                    "widget": "Launcher",
+                    "variant": "icon"
+                  }
+                ]
+              },
+              "Workspaces",
+              {
+                "type": "group",
+                "widgets": [
+                  "Weather",
+                  {
+                    "widget": "Clock",
+                    "variant": "icon+label"
+                  }
+                ]
+              },
+              {
+                "type": "group",
+                "widgets": [
+                  "Wifi",
+                  "Bluetooth"
+                ]
+              },
+              {
+                "type": "group",
+                "widgets": [
+                  {
+                    "widget": "Settings",
+                    "variant": "single"
+                  },
+                  "Notifications"
+                ]
+              },
               "Energy",
-              "Tray",
-              {
-                "widget": "Clock",
-                "variant": "icon+label"
-              },
-              {
-                "widget": "Settings",
-                "variant": "single"
-              },
-              "Notifications",
               "Session"
-            ]
+            ],
+            "right": []
           },
           {
             "alignment": "bottom",
@@ -151,7 +189,7 @@
   },
   "theme": {
     "light_theme": "catppuccin-latte",
-    "dark_theme": "ros\u00c3\u00a9-pine",
+    "dark_theme": "ros\u00e9-pine",
     "active_accent": "accent4",
     "is_dark": true,
     "scheme_type": "scheme-tonal-spot",
@@ -203,10 +241,10 @@
         {
           "key": "Clock",
           "grid_x": 9,
-          "grid_y": 3,
+          "grid_y": 0,
           "ax": "center",
           "dx": -1,
-          "ry": 0.3333333333333333
+          "ry": 0.0
         }
       ]
     }
