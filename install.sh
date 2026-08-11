@@ -23,7 +23,19 @@ if [ -f system/nvidia/50-limit-free-buffer-pool-in-wayland-compositors.json ]; t
 fi
 if [ -f system/sddm/theme.conf ]; then
     sudo install -Dm644 system/sddm/theme.conf /etc/sddm.conf.d/theme.conf
-    echo "    tema de SDDM instalado"
+    echo "    tema de SDDM seleccionado"
+fi
+if [ -d system/sddm-theme ]; then
+    T=/usr/share/sddm/themes/sddm-astronaut-theme
+    if [ -d "$T" ]; then
+        [ -f system/sddm-theme/metadata.desktop ] && sudo install -Dm644 system/sddm-theme/metadata.desktop "$T/metadata.desktop"
+        for f in system/sddm-theme/Themes/*.conf; do
+            [ -f "$f" ] && sudo install -Dm644 "$f" "$T/Themes/$(basename "$f")"
+        done
+        echo "    personalizacion del tema sddm-astronaut restaurada"
+    else
+        echo "    AVISO: falta el paquete sddm-astronaut-theme, instalalo antes"
+    fi
 fi
 
 echo "==> Wallpaper"
