@@ -42,9 +42,7 @@
                 "variant": "scale"
               }
             ],
-            "center": [
-              "Dock"
-            ],
+            "center": [],
             "right": [
               "Tray",
               "Session",
@@ -71,6 +69,19 @@
                 "variant": "icon"
               }
             ]
+          },
+          {
+            "alignment": "bottom",
+            "floating_bar": true,
+            "floating_applets": false,
+            "rounded_edges": true,
+            "min_width": true,
+            "auto_hide": false,
+            "left": [],
+            "center": [
+              "Dock"
+            ],
+            "right": []
           }
         ],
         "alignment": "top",
@@ -134,6 +145,19 @@
                 "variant": "icon"
               }
             ]
+          },
+          {
+            "alignment": "bottom",
+            "floating_bar": true,
+            "floating_applets": false,
+            "rounded_edges": true,
+            "min_width": true,
+            "auto_hide": false,
+            "left": [],
+            "center": [
+              "Dock"
+            ],
+            "right": []
           }
         ],
         "alignment": "top",
@@ -217,7 +241,7 @@
         {
           "key": "Clock",
           "grid_x": 9,
-          "grid_y": 8,
+          "grid_y": 7,
           "ax": "center",
           "dx": -1,
           "ry": 0.7777777777777778
