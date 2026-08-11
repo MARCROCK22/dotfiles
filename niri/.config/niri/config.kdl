@@ -7,11 +7,6 @@
 // Find the full list of options on the wiki:
 // https://niri-wm.github.io/niri/Configuration:-Input
 
-output "eDP-1" {
-    mode "1920x1080@144.000"
-    scale 1
-}
-
 spawn-at-startup "sh" "-c" "wl-paste --watch cliphist store"
 spawn-at-startup "udiskie" "--tray"
 
