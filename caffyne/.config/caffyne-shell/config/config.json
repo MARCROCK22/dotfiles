@@ -12,67 +12,65 @@
         "bars": [
           {
             "alignment": "top",
-            "floating_bar": true,
+            "floating_bar": false,
             "floating_applets": true,
             "rounded_edges": true,
-            "min_width": true,
+            "min_width": false,
             "auto_hide": false,
-            "left": [],
-            "center": [
+            "left": [
               {
-                "type": "group",
-                "widgets": [
-                  {
-                    "widget": "Dash",
-                    "variant": "icon+label"
-                  },
-                  {
-                    "widget": "Launcher",
-                    "variant": "icon"
-                  }
-                ]
+                "widget": "Workspaces",
+                "variant": "numbers"
               },
-              "Workspaces",
+              {
+                "widget": "Dash",
+                "variant": "icon"
+              },
+              {
+                "widget": "Processes",
+                "variant": "scale"
+              },
               {
                 "type": "group",
                 "widgets": [
                   "Weather",
+                  "Media"
+                ]
+              },
+              {
+                "widget": "Brightness",
+                "variant": "scale"
+              }
+            ],
+            "center": [
+              "Dock"
+            ],
+            "right": [
+              "Tray",
+              "Session",
+              "Calendar",
+              {
+                "widget": "Energy",
+                "variant": "scale"
+              },
+              {
+                "type": "group",
+                "widgets": [
                   {
                     "widget": "Clock",
                     "variant": "icon+label"
-                  }
-                ]
-              },
-              {
-                "type": "group",
-                "widgets": [
-                  {
-                    "widget": "Wifi",
-                    "variant": "icon"
                   },
-                  "Bluetooth"
-                ]
-              },
-              {
-                "type": "group",
-                "widgets": [
                   {
                     "widget": "Settings",
                     "variant": "single"
-                  },
-                  {
-                    "widget": "Notifications",
-                    "variant": "icon"
                   }
                 ]
               },
               {
-                "widget": "Energy",
-                "variant": "scale+label"
-              },
-              "Session"
-            ],
-            "right": []
+                "widget": "Notifications",
+                "variant": "icon"
+              }
+            ]
           }
         ],
         "alignment": "top",
@@ -83,55 +81,59 @@
         "bars": [
           {
             "alignment": "top",
-            "floating_bar": true,
+            "floating_bar": false,
             "floating_applets": true,
             "rounded_edges": true,
-            "min_width": true,
+            "min_width": false,
             "auto_hide": false,
-            "left": [],
-            "center": [
+            "left": [
               {
-                "type": "group",
-                "widgets": [
-                  "Dash",
-                  {
-                    "widget": "Launcher",
-                    "variant": "icon"
-                  }
-                ]
+                "widget": "Dash",
+                "variant": "icon"
               },
-              "Workspaces",
+              {
+                "widget": "Workspaces",
+                "variant": "dots"
+              },
+              {
+                "widget": "Launcher",
+                "variant": "icon"
+              },
+              "Weather",
+              "Focused"
+            ],
+            "center": [
+              "Tray"
+            ],
+            "right": [
+              {
+                "widget": "Processes",
+                "variant": "icon"
+              },
+              {
+                "widget": "Energy",
+                "variant": "icon"
+              },
+              "Session",
+              "Calendar",
               {
                 "type": "group",
                 "widgets": [
-                  "Weather",
                   {
                     "widget": "Clock",
                     "variant": "icon+label"
+                  },
+                  {
+                    "widget": "Settings",
+                    "variant": "single"
                   }
                 ]
               },
               {
-                "type": "group",
-                "widgets": [
-                  "Wifi",
-                  "Bluetooth"
-                ]
-              },
-              {
-                "type": "group",
-                "widgets": [
-                  {
-                    "widget": "Settings",
-                    "variant": "single"
-                  },
-                  "Notifications"
-                ]
-              },
-              "Energy",
-              "Session"
-            ],
-            "right": []
+                "widget": "Notifications",
+                "variant": "icon"
+              }
+            ]
           }
         ],
         "alignment": "top",

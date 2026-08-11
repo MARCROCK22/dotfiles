@@ -22,6 +22,7 @@ brightnessctl
 btop
 btrfs-assistant
 btrfs-progs
+bun
 cachyos-fish-config
 cachyos-hello
 cachyos-hooks
