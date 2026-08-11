@@ -73,19 +73,6 @@
               "Session"
             ],
             "right": []
-          },
-          {
-            "alignment": "bottom",
-            "floating_bar": true,
-            "floating_applets": false,
-            "rounded_edges": true,
-            "min_width": true,
-            "auto_hide": false,
-            "left": [],
-            "center": [
-              "Dock"
-            ],
-            "right": []
           }
         ],
         "alignment": "top",
@@ -143,19 +130,6 @@
               },
               "Energy",
               "Session"
-            ],
-            "right": []
-          },
-          {
-            "alignment": "bottom",
-            "floating_bar": true,
-            "floating_applets": false,
-            "rounded_edges": true,
-            "min_width": true,
-            "auto_hide": false,
-            "left": [],
-            "center": [
-              "Dock"
             ],
             "right": []
           }
@@ -241,7 +215,7 @@
         {
           "key": "Clock",
           "grid_x": 9,
-          "grid_y": 7,
+          "grid_y": 8,
           "ax": "center",
           "dx": -1,
           "ry": 0.7777777777777778
