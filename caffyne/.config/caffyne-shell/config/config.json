@@ -51,7 +51,7 @@
               "Calendar",
               {
                 "widget": "Energy",
-                "variant": "scale"
+                "variant": "scale+label"
               },
               {
                 "type": "group",
@@ -165,14 +165,14 @@
   },
   "theme": {
     "light_theme": "catppuccin-latte",
-    "dark_theme": "ros\u00e9-pine",
-    "active_accent": "accent4",
+    "dark_theme": "Matugen",
+    "active_accent": "accent10",
     "is_dark": true,
     "scheme_type": "scheme-tonal-spot",
-    "opacity": 1.0,
+    "opacity": 0.8,
     "blur": true,
-    "border_style": "medium",
-    "font_monospace_style": "none"
+    "border_style": "round",
+    "font_monospace_style": "mixed"
   },
   "launcher": {
     "grid": false
