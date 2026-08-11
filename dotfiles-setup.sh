@@ -13,7 +13,7 @@
 
 set -uo pipefail
 
-VERSION="6"
+VERSION="7"
 DOTS="$HOME/dotfiles"
 ESTE="$(readlink -f "${BASH_SOURCE[0]}")"
 FALTANTES=()
@@ -177,6 +177,31 @@ for candidato in "/etc/sddm.conf.d/theme.conf" "/etc/sddm.conf.d/theme,conf"; do
 done
 [ "$SDDM_OK" = "0" ] && { warn "no se encontró configuración de tema de SDDM"; FALTANTES+=("tema sddm"); }
 
+# Los archivos del propio tema viven en /usr/share y los pisa cualquier
+# actualizacion del paquete. Ahi esta el FontSize, los colores y el fondo,
+# asi que hay que versionarlos aparte del /etc/sddm.conf.d/theme.conf.
+TEMA_SDDM="/usr/share/sddm/themes/sddm-astronaut-theme"
+if sudo test -d "$TEMA_SDDM"; then
+    mkdir -p "$DOTS/system/sddm-theme/Themes"
+
+    # metadata.desktop dice que variante esta seleccionada
+    if sudo test -f "$TEMA_SDDM/metadata.desktop"; then
+        sudo cp "$TEMA_SDDM/metadata.desktop" "$DOTS/system/sddm-theme/"
+        ok "sddm-astronaut / metadata.desktop"
+        COPIADOS=$((COPIADOS + 1))
+    fi
+
+    # Solo la variante en uso, no las diez
+    VARIANTE=$(sudo grep -oP 'ConfigFile=Themes/\K.*' "$TEMA_SDDM/metadata.desktop" 2>/dev/null | head -1)
+    if [ -n "$VARIANTE" ] && sudo test -f "$TEMA_SDDM/Themes/$VARIANTE"; then
+        sudo cp "$TEMA_SDDM/Themes/$VARIANTE" "$DOTS/system/sddm-theme/Themes/"
+        ok "sddm-astronaut / $VARIANTE"
+        COPIADOS=$((COPIADOS + 1))
+    else
+        warn "no se pudo determinar la variante activa del tema de SDDM"
+    fi
+fi
+
 sudo chown -R "$USER:$USER" "$DOTS/system" 2>/dev/null
 
 # ---------- lista de paquetes ----------
@@ -212,7 +237,19 @@ if [ -f system/nvidia/50-limit-free-buffer-pool-in-wayland-compositors.json ]; t
 fi
 if [ -f system/sddm/theme.conf ]; then
     sudo install -Dm644 system/sddm/theme.conf /etc/sddm.conf.d/theme.conf
-    echo "    tema de SDDM instalado"
+    echo "    tema de SDDM seleccionado"
+fi
+if [ -d system/sddm-theme ]; then
+    T=/usr/share/sddm/themes/sddm-astronaut-theme
+    if [ -d "$T" ]; then
+        [ -f system/sddm-theme/metadata.desktop ] && sudo install -Dm644 system/sddm-theme/metadata.desktop "$T/metadata.desktop"
+        for f in system/sddm-theme/Themes/*.conf; do
+            [ -f "$f" ] && sudo install -Dm644 "$f" "$T/Themes/$(basename "$f")"
+        done
+        echo "    personalizacion del tema sddm-astronaut restaurada"
+    else
+        echo "    AVISO: falta el paquete sddm-astronaut-theme, instalalo antes"
+    fi
 fi
 
 echo "==> Wallpaper"
