@@ -15,8 +15,6 @@ output "eDP-1" {
 spawn-at-startup "sh" "-c" "wl-paste --watch cliphist store"
 spawn-at-startup "udiskie" "--tray"
 
-
-
 input {
     keyboard {
         xkb {
@@ -392,6 +390,8 @@ binds {
     // Mod-Shift-/, which is usually the same as Mod-?,
     // shows a list of important hotkeys.
     Mod+Shift+Slash { show-hotkey-overlay; }
+
+    Mod+Shift+Ctrl+T { toggle-debug-tint; }
 
     Mod+Shift+W { spawn "fabric-cli" "exec" "caffyne-shell" "bar_manager.toggle('Wallpapers')"; }
 
