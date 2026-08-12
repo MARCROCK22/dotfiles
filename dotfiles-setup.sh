@@ -13,7 +13,7 @@
 
 set -uo pipefail
 
-VERSION="7"
+VERSION="8"
 DOTS="$HOME/dotfiles"
 ESTE="$(readlink -f "${BASH_SOURCE[0]}")"
 FALTANTES=()
@@ -177,6 +177,16 @@ for candidato in "/etc/sddm.conf.d/theme.conf" "/etc/sddm.conf.d/theme,conf"; do
 done
 [ "$SDDM_OK" = "0" ] && { warn "no se encontró configuración de tema de SDDM"; FALTANTES+=("tema sddm"); }
 
+# Quirks de libinput. Aqui vive el apaño que desactiva el "disable while
+# typing" del touchpad marcando el teclado interno como externo: niri no
+# permite apagar dwt desde su config, y libinput lo trae activo por defecto.
+if sudo test -f /etc/libinput/local-overrides.quirks; then
+    mkdir -p "$DOTS/system/libinput"
+    sudo cp /etc/libinput/local-overrides.quirks "$DOTS/system/libinput/"
+    ok "quirks de libinput (touchpad)"
+    COPIADOS=$((COPIADOS + 1))
+fi
+
 # Los archivos del propio tema viven en /usr/share y los pisa cualquier
 # actualizacion del paquete. Ahi esta el FontSize, los colores y el fondo,
 # asi que hay que versionarlos aparte del /etc/sddm.conf.d/theme.conf.
@@ -238,6 +248,10 @@ fi
 if [ -f system/sddm/theme.conf ]; then
     sudo install -Dm644 system/sddm/theme.conf /etc/sddm.conf.d/theme.conf
     echo "    tema de SDDM seleccionado"
+fi
+if [ -f system/libinput/local-overrides.quirks ]; then
+    sudo install -Dm644 system/libinput/local-overrides.quirks /etc/libinput/local-overrides.quirks
+    echo "    quirks de libinput instalados (requiere reiniciar sesion)"
 fi
 if [ -d system/sddm-theme ]; then
     T=/usr/share/sddm/themes/sddm-astronaut-theme
