@@ -1,53 +1,79 @@
 # dotfiles
 
-Configuración de escritorio para **CachyOS + Niri + Caffyne**.
+Configuración de escritorio para **CachyOS + Hyprland + end-4 (illogical-impulse)**.
+
+Este repo contiene **solo lo que va encima de end-4**, no end-4 entero.
 
 ## Qué hay aquí
 
 | Carpeta | Contenido |
 |---|---|
-| `niri/` | Configuración del compositor (sin lo específico de máquina) |
-| `hypr/` | `hyprlock.conf` — pantalla de bloqueo |
+| `hypr/` | `custom/*.lua` — mis overrides de Hyprland. Lo de end-4 no está aquí |
+| `illogical-impulse/` | `config.json` del shell (barra, dock, sidebars, temas) |
+| `quickshell/` | Archivos de end-4 **modificados**. `install.sh` no los despliega |
 | `alacritty/` | Terminal |
 | `bin/` | Scripts propios (`recorder`: grabación de pantalla) |
-| `caffyne/` | `config.json` del shell Caffyne |
 | `spicetify/` | Tema de Spotify |
 | `fish/` | Shell |
 | `fastfetch/` | Resumen del sistema al abrir la terminal |
-| `system/` | Archivos de `/etc`, los instala `install.sh` |
-| `wallpaper/` | Fondo actual — matugen genera la paleta a partir de él |
+| `starship/` | Prompt |
+| `system/` | Archivos de `/etc` y `/usr/share`, los instala `install.sh` |
+| `wallpaper/` | Fondo actual — de él sale la paleta Material You |
 
 ## Instalación en una máquina nueva
 
 ```bash
+# 1. Primero end-4, que es la base
+bash <(curl -s https://ii.clsty.link/get)
+
+# 2. Luego esto, que va encima
 git clone https://github.com/MARCROCK22/dotfiles.git ~/dotfiles
 cd ~/dotfiles
 sudo pacman -S --needed - < pkglist.txt
 ./install.sh
 ```
 
-Después hay que crear `~/.config/niri/machine.kdl` a mano. Ejemplo para un
-equipo de escritorio (sin bloque `touchpad`):
+`install.sh` enlaza con **stow** todo menos `quickshell/`, e instala los
+archivos de sistema con sudo.
 
-```kdl
-output "DP-1" {
-    mode "2560x1440@144.000"
-    scale 1
-}
+## Lo que hay que tocar a mano
+
+**El monitor.** `hypr/.config/hypr/custom/general.lua` trae el output de la
+máquina donde se generó. Cámbialo por el de esta (`hyprctl monitors`).
+
+**Los parches de `quickshell/`.** Sobrescriben archivos de end-4, así que
+`install.sh` no los copia: imprime un bucle de `diff` para compararlos antes.
+Si tu versión de end-4 no es la misma con la que se generaron, el diff mostrará
+líneas ajenas y hay que reaplicar los cambios a mano.
+
+| Archivo | Por qué está modificado |
+|---|---|
+| `bar/BarContent.qml` | Disposición: recursos a la izquierda, workspaces centrados, reloj a la derecha |
+| `bar/StyledPopup.qml` | **Bug de end-4**: `margins.left` no se acota a la pantalla, los popups se recortan cerca de un borde |
+| `background/Background.qml` | **Bug de scrolloverview**: el plugin solo dibuja `LAYER_BACKGROUND` y end-4 pinta en `WlrLayer.Bottom`, así que el overview salía gris |
+
+**El plugin del overview.** No es un paquete de pacman:
+
+```bash
+hyprpm add https://github.com/yayuuu/hyprland-scroll-overview.git
+hyprpm update && hyprpm enable scrolloverview
 ```
 
-## Lo que NO está aquí
-
-`~/.config/niri/machine.kdl` — monitor y touchpad, distinto en cada equipo.
-Está en `.gitignore` a propósito; hay que crearlo a mano tras instalar.
+La ruta del `.so` en `custom/general.lua` lleva el nombre de usuario dentro
+(`/var/cache/hyprpm/<usuario>/...`). Ajústala si en esta máquina es otro.
 
 ## Notas
 
-- **Nvidia + Niri**: `system/nvidia/` contiene el perfil que limita la fuga de
-  VRAM del driver. Sin él, niri consume ~1 GiB en vez de ~100 MiB.
-- **Caffyne** no es un paquete de pacman, sino un clon de git en
-  `~/.config/caffyne-shell`. Sus dependencias aparecen como huérfanas para
-  pacman: **no ejecutar `pacman -Rns $(pacman -Qtdq)` sin revisar la lista.**
+- **Hyprland 0.55+ usa Lua**, no hyprlang. `hyprctl keyword` falla con
+  *"can't work with non-legacy parsers"*; para probar en caliente, `hyprctl eval`.
+- **`custom/` gana sobre `hyprland/`**: se carga después. Nunca editar
+  `~/.config/hypr/hyprland/`, lo pisa cada actualización de end-4.
+- **Los plugins de hyprpm se compilan contra la versión exacta de Hyprland.**
+  Tras cada actualización del compositor hay que volver a lanzar `hyprpm update`
+  o el plugin deja de cargar.
+- **Nvidia**: `system/nvidia/` limita la fuga de VRAM del driver (~1 GiB en vez
+  de ~100 MiB). Solo importa cuando el compositor corre **sobre** la Nvidia; en
+  modo híbrido, con la sesión en la Intel, no interviene.
 - **`prime-run`**: en portátiles con gráficos híbridos, los juegos necesitan
   `prime-run %command%` en las opciones de lanzamiento de Steam.
 
