@@ -11,3 +11,4 @@ fish_variables
 *.log
 *.bak
 .cache/
+*.bak-*

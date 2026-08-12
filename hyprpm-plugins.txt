@@ -1,0 +1,4 @@
+[0m→[0m Repository hyprland-scroll-overview (by yayuuu):
+  │ Plugin scrolloverview
+  └─ enabled: [32mtrue
+[0m
