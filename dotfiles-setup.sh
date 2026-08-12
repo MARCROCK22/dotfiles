@@ -18,7 +18,7 @@
 
 set -uo pipefail
 
-VERSION="9"
+VERSION="10"
 DOTS="$HOME/dotfiles"
 ESTE="$(readlink -f "${BASH_SOURCE[0]}")"
 FALTANTES=()
@@ -526,9 +526,28 @@ fi
 say "Escaneando en busca de secretos (el repo es público)"
 
 PATRON='api[_-]?key|apikey|access[_-]?token|auth[_-]?token|secret|passwd|password|client[_-]?secret|bearer|ghp_|github_pat_|sk-'
+
+# Falsos positivos ya revisados uno a uno. Un escaner que siempre sale en
+# rojo se deja de leer, asi que el ruido conocido se filtra a proposito.
+RUIDO='tokenColorCustomizations|semanticTokenColor'          # temas de VS Code
+RUIDO="$RUIDO|password managers|World\.Secrets|KeePassXC"    # ejemplos heredados de niri
+RUIDO="$RUIDO|key_get_link|requires_key|key_id"              # end-4: nombran una key, no la contienen
+RUIDO="$RUIDO|Password(Field|Icon|Focus)|HoverPassword"      # tema de SDDM: son colores
+RUIDO="$RUIDO|HideCompletePassword|AllowEmptyPassword"       # tema de SDDM: son booleanos
+RUIDO="$RUIDO|TranslatePlaceholderPassword"
+RUIDO="$RUIDO|changePassword|requirePasswordToPower"         # un comando y un booleano
+# Comentarios en prosa del tema de SDDM. Se listan uno a uno en vez de
+# ignorar todos los comentarios: una clave pegada en un comentario es
+# exactamente lo que este escaneo tiene que seguir cazando.
+RUIDO="$RUIDO|focuses password field|Hides the password while typing"
+RUIDO="$RUIDO|users without a password"
+
+# El propio script se excluye: su variable PATRON contiene justo las palabras
+# que busca, asi que se encontraba a si mismo en cada ejecucion.
 RESULTADO=$(grep -rniE "$PATRON" "$DOTS" \
-    --exclude-dir=.git --exclude=README.md --exclude=pkglist.txt 2>/dev/null \
-    | grep -viE 'tokenColorCustomizations|semanticTokenColor|password managers|World\.Secrets|KeePassXC|key_get_link|requires_key|key_id')
+    --exclude-dir=.git --exclude=README.md --exclude=pkglist.txt \
+    --exclude=dotfiles-setup.sh 2>/dev/null \
+    | grep -viE "$RUIDO")
 
 if [ -n "$RESULTADO" ]; then
     echo "$RESULTADO"
