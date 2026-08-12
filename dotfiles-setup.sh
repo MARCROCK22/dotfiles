@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# dotfiles-setup.sh  (v12)
+# dotfiles-setup.sh  (v13)
 # Monta o actualiza el repositorio de dotfiles para CachyOS + Hyprland + end-4.
 #
 # Es idempotente: puedes ejecutarlo las veces que quieras. Si ~/dotfiles ya
@@ -27,15 +27,33 @@
 #         * 'cd $DOTS' comprobado; merge/rebase/HEAD desacoplado detectados.
 #         * git ya no PISA tu identidad configurada.
 #         * monitors.lua deja de versionarse: es de cada maquina.
+#   v13 — resto de la revision adversarial:
+#         * copiar_dir() refleja borrados; antes 'cp -r' solo fusionaba y un
+#           archivo borrado de tu config seguia publicandose para siempre.
+#         * Los parches llevan FIRMA: si end-4 los pisa, no se sobrescribe la
+#           version buena del repo con la que ya no tiene el parche.
+#         * rc comprobado en los 'sudo cp'; $USER vacio ya no aborta.
+#         * El escaneo ya no se salta los README de spicetify/, y 'key_id'
+#           deja de tragarse lineas enteras.
+#         * Se rechaza la ejecucion por tuberia (readlink daba /dev/fd/63).
 #
 # Uso:  bash dotfiles-setup.sh
 #
 
 set -uo pipefail
 
-VERSION="12"
+VERSION="13"
 DOTS="$HOME/dotfiles"
-ESTE="$(readlink -f "${BASH_SOURCE[0]}")"
+ESTE="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || true)"
+# Con 'bash <(curl ...)' o 'bash < script', BASH_SOURCE no es un archivo real
+# y se copiaria /dev/fd/63 al repo como si fuera el script.
+case "$ESTE" in
+    ""|/dev/fd/*|/proc/self/fd/*|bash|/dev/stdin)
+        printf '\033[1;31m✗\033[0m Ejecuta el script desde un archivo, no por tuberia:\n'
+        printf '    bash dotfiles-setup.sh\n'
+        exit 1
+        ;;
+esac
 FALTANTES=()
 AVISOS=()
 COPIADOS=0
@@ -66,6 +84,30 @@ copiar() {
     else
         warn "no encontrado: $etiqueta  ($origen)"
         FALTANTES+=("$etiqueta -> $origen")
+    fi
+}
+
+# Copia un DIRECTORIO reflejando borrados. 'cp -r dir dest/' fusiona con lo
+# que ya hay, asi que el repo solo crecia: si borrabas un archivo de tu config,
+# seguia publicandose. Se copia a un temporal y se sustituye entero.
+copiar_dir() {
+    local origen="$1" destino="$2" etiqueta="$3"
+    if [ ! -d "$origen" ]; then
+        warn "no encontrado: $etiqueta  ($origen)"
+        FALTANTES+=("$etiqueta -> $origen")
+        return
+    fi
+    local tmp="${destino}.tmp.$$"
+    rm -rf "$tmp"
+    if cp -r "$origen" "$tmp"; then
+        limpiar_bak "$tmp"
+        rm -rf "${destino:?}"
+        mv "$tmp" "$destino"
+        ok "$etiqueta ($(find "$destino" -type f | wc -l) archivo(s))"
+        COPIADOS=$((COPIADOS + 1))
+    else
+        rm -rf "$tmp"
+        err "fallo copiando: $etiqueta (se conserva lo anterior)"
     fi
 }
 
@@ -197,21 +239,7 @@ say "Copiando configuración de usuario"
 
 # Solo custom/: hyprland.lua y la carpeta hyprland/ son de end-4 y las
 # sobrescribe su instalador. Lo tuyo vive entero en custom/.
-if [ -d "$HOME/.config/hypr/custom" ]; then
-    rm -rf "$DOTS/hypr/.config/hypr/custom"
-    mkdir -p "$DOTS/hypr/.config/hypr/custom"
-    if cp -r "$HOME/.config/hypr/custom/." "$DOTS/hypr/.config/hypr/custom/"; then
-        limpiar_bak "$DOTS/hypr/.config/hypr/custom"
-        N=$(find "$DOTS/hypr/.config/hypr/custom" -type f | wc -l)
-        ok "hypr / custom/ ($N archivo(s), sin respaldos)"
-        COPIADOS=$((COPIADOS + 1))
-    else
-        err "fallo copiando hypr/custom"
-    fi
-else
-    warn "no existe ~/.config/hypr/custom"
-    FALTANTES+=("hypr/custom")
-fi
+copiar_dir "$HOME/.config/hypr/custom" "$DOTS/hypr/.config/hypr/custom" "hypr / custom/"
 
 copiar "$HOME/.config/illogical-impulse/config.json" \
        "$DOTS/illogical-impulse/.config/illogical-impulse" "illogical-impulse / config.json"
@@ -234,12 +262,12 @@ fi
 copiar "$HOME/.config/alacritty/alacritty.toml"   "$DOTS/alacritty/.config/alacritty" "alacritty"
 copiar "$HOME/.local/bin/recorder"                "$DOTS/bin/.local/bin"              "script recorder"
 copiar          "$HOME/.config/fish/config.fish" "$DOTS/fish/.config/fish" "fish / config.fish"
-copiar_opcional "$HOME/.config/fish/functions"   "$DOTS/fish/.config/fish" "fish / functions"
-copiar_opcional "$HOME/.config/fish/conf.d"      "$DOTS/fish/.config/fish" "fish / conf.d"
+copiar_dir      "$HOME/.config/fish/functions" "$DOTS/fish/.config/fish/functions" "fish / functions"
+copiar_dir      "$HOME/.config/fish/conf.d"    "$DOTS/fish/.config/fish/conf.d"    "fish / conf.d"
 # fish_variables se excluye a propósito: lo genera fish solo y cambia constantemente
 # VS Code se excluye a proposito: el repo es publico y sus ajustes pueden
 # arrastrar rutas, tokens de extensiones y configuracion de trabajo.
-copiar "$HOME/.config/spicetify"                  "$DOTS/spicetify/.config"           "spicetify"
+copiar_dir "$HOME/.config/spicetify" "$DOTS/spicetify/.config/spicetify" "spicetify"
 copiar "$HOME/.config/fastfetch/config.jsonc"     "$DOTS/fastfetch/.config/fastfetch" "fastfetch"
 copiar "$HOME/.config/starship.toml"              "$DOTS/starship/.config"            "starship (prompt)"
 
@@ -250,22 +278,46 @@ say "Copiando los parches de end-4"
 # Se versionan porque cada actualizacion suya los pisa y hay que reaplicarlos.
 # install.py NO los despliega solo, precisamente porque sobrescriben.
 QS="$HOME/.config/quickshell/ii/modules/ii"
+# Cada parche lleva una FIRMA: un fragmento que solo existe en la version
+# parcheada. Si una actualizacion de end-4 pisa el archivo, la firma desaparece
+# y copiarlo al repo borraria el parche en silencio -- que es justo lo que se
+# quiere evitar versionandolos.
 PARCHES=(
-    "bar/BarContent.qml|disposición de barra: recursos a la izquierda, reloj a la derecha"
-    "bar/StyledPopup.qml|bug de end-4: popups recortados en los bordes"
-    "background/Background.qml|bug de scrolloverview: WlrLayer.Bottom -> Background"
+    "bar/BarContent.qml|rightCenterGroupContent.implicitWidth|disposición de barra: recursos a la izquierda, reloj a la derecha"
+    "bar/StyledPopup.qml|Math.max(0, Math.min|bug de end-4: popups recortados en los bordes"
+    "background/Background.qml|WlrLayer.Background|bug de scrolloverview: WlrLayer.Bottom -> Background"
 )
 for entrada in "${PARCHES[@]}"; do
     ruta="${entrada%%|*}"
-    desc="${entrada##*|}"
-    if [ -f "$QS/$ruta" ]; then
-        mkdir -p "$DOTS/quickshell/.config/quickshell/ii/modules/ii/$(dirname "$ruta")"
-        cp "$QS/$ruta" "$DOTS/quickshell/.config/quickshell/ii/modules/ii/$ruta"
+    resto="${entrada#*|}"
+    firma="${resto%%|*}"
+    desc="${resto#*|}"
+    repo_dst="$DOTS/quickshell/.config/quickshell/ii/modules/ii/$ruta"
+
+    if [ ! -f "$QS/$ruta" ]; then
+        warn "no encontrado: $ruta"
+        FALTANTES+=("parche $ruta")
+        continue
+    fi
+
+    if ! grep -qF "$firma" "$QS/$ruta"; then
+        err "$(basename "$ruta"): el parche NO está aplicado en tu sistema"
+        err "  falta la firma: $firma"
+        if [ -f "$repo_dst" ]; then
+            err "  NO se sobrescribe la versión del repo, que sí lo tiene."
+            AVISOS+=("reaplicar el parche de $(basename "$ruta") — end-4 lo pisó")
+        else
+            AVISOS+=("$(basename "$ruta") sin parchear y sin copia en el repo")
+        fi
+        continue
+    fi
+
+    mkdir -p "$(dirname "$repo_dst")"
+    if cp "$QS/$ruta" "$repo_dst"; then
         ok "$(basename "$ruta") — $desc"
         COPIADOS=$((COPIADOS + 1))
     else
-        warn "no encontrado: $ruta"
-        FALTANTES+=("parche $ruta")
+        err "fallo copiando $ruta"
     fi
 done
 
@@ -328,8 +380,11 @@ say "Copiando archivos de sistema (pedirá sudo)"
 
 NVIDIA_SRC="/etc/nvidia/nvidia-application-profiles-rc.d/50-limit-free-buffer-pool-in-wayland-compositors.json"
 if sudo test -e "$NVIDIA_SRC"; then
-    sudo cp "$NVIDIA_SRC" "$DOTS/system/nvidia/"
+    if ! sudo cp "$NVIDIA_SRC" "$DOTS/system/nvidia/"; then
+        err "fallo copiando el perfil de Nvidia (¿falló sudo?)"
+    fi
     ok "perfil de VRAM de Nvidia"
+    COPIADOS=$((COPIADOS + 1))
     # El perfil apunta a un nombre de proceso. Si sigue diciendo niri, no aplica.
     if ! sudo grep -qi 'hyprland' "$NVIDIA_SRC"; then
         warn "el perfil no menciona Hyprland — puede seguir apuntando solo a niri"
@@ -344,7 +399,9 @@ fi
 SDDM_OK=0
 for candidato in "/etc/sddm.conf.d/theme.conf" "/etc/sddm.conf.d/theme,conf"; do
     if sudo test -e "$candidato"; then
-        sudo cp "$candidato" "$DOTS/system/sddm/theme.conf"
+        if ! sudo cp "$candidato" "$DOTS/system/sddm/theme.conf"; then
+            err "fallo copiando el tema de SDDM"; break
+        fi
         ok "tema de SDDM (desde $(basename "$candidato"))"
         SDDM_OK=1
         if [ "$candidato" = "/etc/sddm.conf.d/theme,conf" ]; then
@@ -386,7 +443,14 @@ if sudo test -d "$TEMA_SDDM"; then
     fi
 fi
 
-sudo chown -R "$USER:$USER" "$DOTS/system" 2>/dev/null
+# $USER puede venir vacio o sin definir (cron, su, contenedor); con set -u
+# eso abortaba el script justo antes del escaneo de secretos.
+YO="${USER:-$(id -un)}"
+if ! sudo chown -R "$YO:$YO" "$DOTS/system" 2>/dev/null; then
+    warn "no pude devolverte la propiedad de $DOTS/system"
+    warn "quedan archivos de root en el repo: sudo chown -R $YO:$YO $DOTS/system"
+    AVISOS+=("archivos de root en $DOTS/system")
+fi
 
 # ---------- lista de paquetes ----------
 say "Generando lista de paquetes"
@@ -579,7 +643,8 @@ PATRON="$PATRON|sk-[A-Za-z0-9_-]{16}"
 # rojo se deja de leer, asi que el ruido conocido se filtra a proposito.
 RUIDO='tokenColorCustomizations|semanticTokenColor'          # temas de VS Code
 RUIDO="$RUIDO|password managers|World\.Secrets|KeePassXC"    # ejemplos heredados de niri
-RUIDO="$RUIDO|key_get_link|requires_key|key_id"              # end-4: nombran una key, no la contienen
+RUIDO="$RUIDO|key_get_link|requires_key"                     # end-4: nombran una key, no la contienen
+RUIDO="$RUIDO|\"key_id\"|key_id:"                              # acotado: antes casaba dentro de cualquier token
 RUIDO="$RUIDO|Password(Field|Icon|Focus)|HoverPassword"      # tema de SDDM: son colores
 RUIDO="$RUIDO|HideCompletePassword|AllowEmptyPassword"       # tema de SDDM: son booleanos
 RUIDO="$RUIDO|TranslatePlaceholderPassword"
@@ -592,9 +657,12 @@ RUIDO="$RUIDO|users without a password"
 
 # El propio script se excluye: su variable PATRON contiene justo las palabras
 # que busca, asi que se encontraba a si mismo en cada ejecucion.
+# --exclude=README.md excluia por nombre en TODO el arbol, incluidos los de
+# los temas de spicetify. Se filtra despues, solo el de la raiz.
 RESULTADO=$(grep -rniE "$PATRON" "$DOTS" \
-    --exclude-dir=.git --exclude=README.md --exclude=pkglist.txt \
+    --exclude-dir=.git --exclude=pkglist.txt \
     --exclude=dotfiles-setup.sh 2>/dev/null \
+    | grep -v "^$DOTS/README.md:" \
     | grep -viE "$RUIDO")
 
 if [ -n "$RESULTADO" ]; then

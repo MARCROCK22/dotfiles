@@ -706,6 +706,27 @@ def paso_sistema():
         origen = AQUI / rel
         if not origen.is_file():
             continue
+
+        # El perfil de Nvidia lleva DENTRO el nombre del proceso del compositor.
+        # dotfiles-setup.sh ya avisa si sigue diciendo "niri" al recogerlo, pero
+        # al desplegar se instalaba a ciegas -- y en un PC con Nvidia unica es
+        # justo donde mas importa que este bien.
+        if "nvidia" in rel:
+            try:
+                perfil = origen.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                perfil = ""
+            if "hyprland" not in perfil.lower():
+                err("el perfil de Nvidia no menciona Hyprland")
+                print("        Lleva el nombre del proceso dentro; si dice 'niri',")
+                print("        no se aplica a nada. Corrigelo con:")
+                print("        python3 -c \"import json,pathlib;"
+                      "p=pathlib.Path('%s');d=json.loads(p.read_text());"
+                      "print(d['rules'])\"" % origen)
+                if not pregunta("¿Instalarlo igualmente?", False, destructivo=True):
+                    warn("omitido")
+                    continue
+
         copia = respalda_root(destino)
         # timeout amplio: aqui es donde sudo puede pedir la contrasena.
         rc, _, error = corre(["sudo", "install", "-Dm644", str(origen), destino],
@@ -780,6 +801,7 @@ def paso_wallpaper():
         err("no pude crear %s: %s" % (destino, e))
         return
 
+    copiados = []
     for f in fondos:
         final = destino / f.name
         if final.exists():
@@ -789,8 +811,30 @@ def paso_wallpaper():
         try:
             shutil.copy2(f, final)
             ok("%s -> %s" % (f.name, destino))
+            copiados.append(final)
         except OSError as e:
             err("%s: %s" % (f.name, e))
+
+    # config.json trae la ruta ABSOLUTA del fondo en la maquina anterior. Si
+    # aqui no existe, el shell arranca sin fondo y SIN PALETA Material You, que
+    # es de donde salen todos los colores. Nadie lo mencionaba.
+    cfg = HOME / ".config/illogical-impulse/config.json"
+    if cfg.is_file():
+        try:
+            datos = json.loads(cfg.read_text(encoding="utf-8"))
+            ruta = (datos.get("background") or {}).get("wallpaperPath") or ""
+        except (OSError, json.JSONDecodeError):
+            ruta = ""
+        if ruta and not Path(ruta).is_file():
+            print()
+            warn("config.json apunta a un fondo que aqui no existe:")
+            print("        %s" % ruta)
+            warn("sin el no se genera la paleta Material You: todo saldra gris")
+            if copiados:
+                print("        Lo tienes en: %s" % copiados[0])
+            print("        Aplicalo con Ctrl+Super+T: el selector reescribe")
+            print("        config.json por su cuenta y regenera los colores.")
+            return
     print("        Aplicalo con Ctrl+Super+T para que se regenere la paleta.")
 
 
