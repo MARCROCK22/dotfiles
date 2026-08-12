@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# dotfiles-setup.sh  (v11)
+# dotfiles-setup.sh  (v12)
 # Monta o actualiza el repositorio de dotfiles para CachyOS + Hyprland + end-4.
 #
 # Es idempotente: puedes ejecutarlo las veces que quieras. Si ~/dotfiles ya
@@ -14,15 +14,26 @@
 #         QML de end-4 parcheados. Se eliminan niri/ y caffyne/ del repo.
 #   v10 — el escaneo de secretos deja de dar falsos positivos en cada pasada.
 #   v11 — install.sh se sustituye por install.py, que ya no se genera aqui
-#         sino que es un archivo real del repo. Se recogen monitors.lua y
-#         workspaces.lua, donde vive la configuracion de pantallas.
+#         sino que es un archivo real del repo.
+#   v12 — tras una revision adversarial. Lo importante:
+#         * GUARDA CONTRA STOW: si la maquina ya esta enlazada al repo, el
+#           'rm -rf' previo a copiar vaciaba el repo y se commiteaba. Aborta.
+#         * Un secreto detectado ya NO se commitea: sale con codigo 2.
+#         * El escaneo detecta claves SSH, JWT, AWS, Google, Slack, GitLab;
+#           antes solo veia 2 de 8 formatos reales.
+#         * 'sk-' exigia caracteres detras: casaba con task-, disk-, desk-.
+#         * El wallpaper ya no se borra a si mismo si vive dentro del repo.
+#         * pkglist/hyprpm-plugins no se truncan si el comando falla.
+#         * 'cd $DOTS' comprobado; merge/rebase/HEAD desacoplado detectados.
+#         * git ya no PISA tu identidad configurada.
+#         * monitors.lua deja de versionarse: es de cada maquina.
 #
 # Uso:  bash dotfiles-setup.sh
 #
 
 set -uo pipefail
 
-VERSION="11"
+VERSION="12"
 DOTS="$HOME/dotfiles"
 ESTE="$(readlink -f "${BASH_SOURCE[0]}")"
 FALTANTES=()
@@ -88,6 +99,45 @@ if [ ! -d "$HOME/.config/hypr" ]; then
     err "No existe ~/.config/hypr. ¿Seguro que estás en la máquina con Hyprland?"
     exit 1
 fi
+
+# --- GUARDA CONTRA STOW -----------------------------------------------------
+# Este script RECOGE config de ~/.config hacia el repo. install.py hace lo
+# contrario: convierte esos archivos en enlaces AL repo. Si ya se ejecuto
+# install.py, origen y destino son el mismo inodo, y el 'rm -rf' previo a la
+# copia destruye el contenido real del repo. Verificado: deja custom/ vacio,
+# y 'git add -A' commitea el borrado.
+#
+# Con enlaces, este script no tiene nada que recoger: los archivos YA son el
+# repo. Editarlos edita el repo directamente; basta con hacer commit.
+ENLAZADOS=()
+for ruta in "$HOME/.config/hypr/custom" \
+            "$HOME/.config/hypr/monitors.lua" \
+            "$HOME/.config/alacritty/alacritty.toml" \
+            "$HOME/.config/fish/config.fish" \
+            "$HOME/.config/illogical-impulse/config.json" \
+            "$HOME/.local/bin/recorder"; do
+    if [ -L "$ruta" ]; then
+        DESTINO_ENLACE="$(readlink -f "$ruta" 2>/dev/null || true)"
+        case "$DESTINO_ENLACE" in
+            "$DOTS"/*) ENLAZADOS+=("$ruta -> $DESTINO_ENLACE") ;;
+        esac
+    fi
+done
+
+if [ ${#ENLAZADOS[@]} -gt 0 ]; then
+    err "Esta máquina ya está enlazada al repo con stow:"
+    for e in "${ENLAZADOS[@]}"; do printf '        %s\n' "$e"; done
+    echo
+    echo "    Estos archivos YA SON el repo. Este script los recogería sobre sí"
+    echo "    mismos y el 'rm -rf' previo a la copia dejaría el repo VACÍO."
+    echo
+    echo "    Si has cambiado configuración, ya está en el repo. Solo falta:"
+    echo "        cd $DOTS && git add -A && git status && git commit"
+    echo
+    echo "    Este script es para la máquina ORIGEN, la que aún no está enlazada."
+    exit 1
+fi
+ok "sin enlaces de stow — se puede recoger sin riesgo"
 
 for cmd in git pacman; do
     command -v "$cmd" >/dev/null || { err "falta el comando: $cmd"; exit 1; }
@@ -166,11 +216,15 @@ fi
 copiar "$HOME/.config/illogical-impulse/config.json" \
        "$DOTS/illogical-impulse/.config/illogical-impulse" "illogical-impulse / config.json"
 
-# monitors.lua lo carga hyprland.lua de end-4 DESPUES de custom/, asi que es
-# donde vive la configuracion de pantallas. Es especifico de cada maquina, pero
-# se versiona igual: install.py lo regenera con --solo-monitores.
-copiar_opcional "$HOME/.config/hypr/monitors.lua" "$DOTS/hypr/.config/hypr" "hypr / monitors.lua"
-copiar_opcional "$HOME/.config/hypr/workspaces.lua" "$DOTS/hypr/.config/hypr" "hypr / workspaces.lua"
+# monitors.lua NO se versiona, a proposito. Es el equivalente del machine.kdl
+# que ya usabas en niri: nombres de output, escalas y posiciones son de UNA
+# maquina. Versionarlo hacia que stow plantara en el PC las pantallas del
+# portatil, y que install.py escribiera en el repo al regenerarlo.
+# Lo genera install.py en cada maquina:  python3 install.py --solo-monitores
+if [ -f "$DOTS/hypr/.config/hypr/monitors.lua" ]; then
+    rm -f "$DOTS/hypr/.config/hypr/monitors.lua"
+    ok "monitors.lua retirado del repo (es específico de máquina, va en .gitignore)"
+fi
 
 if [ ! -f "$HOME/.config/hypr/monitors.lua" ] && ! grep -rqs 'hl.monitor(' "$HOME/.config/hypr/custom/"; then
     warn "no hay hl.monitor() en ningun sitio: tu resolucion no esta fijada"
@@ -194,7 +248,7 @@ say "Copiando los parches de end-4"
 
 # Estos NO son configuración: son archivos del propio end-4 modificados.
 # Se versionan porque cada actualizacion suya los pisa y hay que reaplicarlos.
-# install.sh NO los despliega solo, precisamente porque sobrescriben.
+# install.py NO los despliega solo, precisamente porque sobrescriben.
 QS="$HOME/.config/quickshell/ii/modules/ii"
 PARCHES=(
     "bar/BarContent.qml|disposición de barra: recursos a la izquierda, reloj a la derecha"
@@ -238,10 +292,32 @@ except Exception:
 fi
 
 if [ -n "$WP" ] && [ -f "$WP" ]; then
-    rm -f "$DOTS"/wallpaper/* 2>/dev/null
-    cp "$WP" "$DOTS/wallpaper/"
-    ok "wallpaper: $(basename "$WP")"
-    COPIADOS=$((COPIADOS + 1))
+    # Si el fondo en uso vive DENTRO del repo -- lo normal tras migrar, porque
+    # install.py lo copia desde aqui -- el 'rm -f wallpaper/*' lo destruiria
+    # justo antes de intentar copiarlo. Verificado: borra el original, el cp
+    # falla, y sin '-e' el script seguia adelante.
+    WP_REAL="$(readlink -f "$WP" 2>/dev/null || printf '%s' "$WP")"
+    DOTS_REAL="$(readlink -f "$DOTS" 2>/dev/null || printf '%s' "$DOTS")"
+    case "$WP_REAL" in
+        "$DOTS_REAL"/*)
+            ok "wallpaper: $(basename "$WP") — ya está en el repo, no se toca"
+            ;;
+        *)
+            # Copiar primero, sustituir despues: nunca se borra sin tener
+            # el reemplazo ya en disco.
+            TMP_WP="$DOTS/wallpaper/.nuevo-$$"
+            if cp "$WP_REAL" "$TMP_WP"; then
+                find "$DOTS/wallpaper" -maxdepth 1 -type f ! -name ".nuevo-$$" -delete 2>/dev/null
+                mv "$TMP_WP" "$DOTS/wallpaper/$(basename "$WP_REAL")"
+                ok "wallpaper: $(basename "$WP_REAL")"
+                COPIADOS=$((COPIADOS + 1))
+            else
+                rm -f "$TMP_WP"
+                err "no pude copiar el wallpaper; el anterior se conserva"
+                FALTANTES+=("wallpaper")
+            fi
+            ;;
+    esac
 else
     warn "no se pudo leer background.wallpaperPath"
     AVISOS+=("copiar el wallpaper a mano a ~/dotfiles/wallpaper/")
@@ -314,13 +390,32 @@ sudo chown -R "$USER:$USER" "$DOTS/system" 2>/dev/null
 
 # ---------- lista de paquetes ----------
 say "Generando lista de paquetes"
-pacman -Qqe > "$DOTS/pkglist.txt"
-ok "$(wc -l < "$DOTS/pkglist.txt") paquetes explícitos"
+
+# '> archivo' TRUNCA antes de ejecutar el comando: si este falla, la lista
+# buena se sustituye por una vacia y git la commitea. Se escribe aparte y solo
+# se sustituye si el resultado tiene contenido.
+TMP_PKG="$DOTS/.pkglist.$$"
+if pacman -Qqe > "$TMP_PKG" 2>/dev/null && [ -s "$TMP_PKG" ]; then
+    mv "$TMP_PKG" "$DOTS/pkglist.txt"
+    ok "$(wc -l < "$DOTS/pkglist.txt") paquetes explícitos"
+else
+    rm -f "$TMP_PKG"
+    err "pacman -Qqe no devolvió nada; se conserva el pkglist.txt anterior"
+    FALTANTES+=("pkglist.txt")
+fi
 
 # El plugin del overview no es un paquete: hyprpm lo compila aparte.
+# hyprpm necesita Hyprland corriendo: por SSH o desde un TTY devuelve vacio,
+# y antes eso borraba la lista buena.
 if command -v hyprpm >/dev/null; then
-    hyprpm list 2>/dev/null > "$DOTS/hyprpm-plugins.txt" && \
-        ok "plugins de hyprpm anotados en hyprpm-plugins.txt"
+    TMP_HP="$DOTS/.hyprpm.$$"
+    if hyprpm list > "$TMP_HP" 2>/dev/null && [ -s "$TMP_HP" ]; then
+        mv "$TMP_HP" "$DOTS/hyprpm-plugins.txt"
+        ok "plugins de hyprpm anotados"
+    else
+        rm -f "$TMP_HP"
+        warn "hyprpm no respondió (¿Hyprland no está corriendo?); lista anterior intacta"
+    fi
 fi
 
 # ---------- install.sh ----------
@@ -360,12 +455,14 @@ fi
 # entradas que falten, para no borrar lo que hayas puesto tú a mano.
 ENTRADAS=(
     'machine.kdl'
+    'monitors.lua'          # específico de máquina, lo genera install.py
     'launcher_usage.json'
     'fish_variables'
     '*.bak'
     '*.bak-*'
     '*.log'
     '.cache/'
+    '__pycache__/'
 )
 if [ ! -f "$DOTS/.gitignore" ]; then
     printf '%s\n' "${ENTRADAS[@]}" > "$DOTS/.gitignore"
@@ -402,14 +499,14 @@ Configuración de escritorio para **CachyOS + Hyprland + end-4 (illogical-impuls
 |---|---|
 | `hypr/` | `custom/*.lua` — mis overrides de Hyprland. Lo de end-4 no está aquí |
 | `illogical-impulse/` | `config.json` del shell |
-| `quickshell/` | Archivos de end-4 **modificados**. No los despliega `install.sh` |
+| `quickshell/` | Archivos de end-4 **modificados**. `install.py` pregunta antes |
 | `alacritty/` | Terminal |
 | `bin/` | Scripts propios (`recorder`: grabación de pantalla) |
 | `spicetify/` | Tema de Spotify |
 | `fish/` | Shell |
 | `fastfetch/` | Resumen del sistema al abrir la terminal |
 | `starship/` | Prompt |
-| `system/` | Archivos de `/etc` y `/usr/share`, los instala `install.sh` |
+| `system/` | Archivos de `/etc` y `/usr/share`, los instala `install.py` |
 | `wallpaper/` | Fondo actual — de él sale la paleta Material You |
 
 ## Instalación en una máquina nueva
@@ -422,15 +519,15 @@ bash <(curl -s https://ii.clsty.link/get)
 git clone <este-repo> ~/dotfiles
 cd ~/dotfiles
 sudo pacman -S --needed - < pkglist.txt
-./install.sh
+python3 install.py
 ```
 
 ## Lo que hay que tocar a mano
 
-- **El monitor**: `hypr/.config/hypr/custom/general.lua` trae el output de la
-  máquina donde se generó.
-- **Los parches de `quickshell/`**: sobrescriben archivos de end-4. `install.sh`
-  imprime cómo compararlos antes de copiar.
+- **Las pantallas**: no se versionan. Las genera `install.py` en cada máquina,
+  en `~/.config/hypr/monitors.lua` (como el `machine.kdl` de niri).
+- **Los parches de `quickshell/`**: sobrescriben archivos de end-4. `install.py`
+  te enseña el diff y pregunta uno por uno.
 - **El plugin del overview**: se instala con `hyprpm`, no con pacman. La ruta
   del `.so` en `custom/general.lua` lleva el nombre de usuario dentro.
 
@@ -463,7 +560,20 @@ fi
 # ---------- escaneo de secretos ----------
 say "Escaneando en busca de secretos (el repo es público)"
 
-PATRON='api[_-]?key|apikey|access[_-]?token|auth[_-]?token|secret|passwd|password|client[_-]?secret|bearer|ghp_|github_pat_|sk-'
+# Dos familias: etiquetas ("api_key = ...") y FORMAS de credencial reconocibles.
+# Solo con etiquetas se colaban claves privadas SSH, JWT, y tokens de AWS,
+# Google, Slack y GitLab, que no llevan ninguna de esas palabras al lado.
+PATRON='api[_-]?key|apikey|access[_-]?token|auth[_-]?token|secret|passwd|password|client[_-]?secret|bearer'
+PATRON="$PATRON|-----BEGIN [A-Z ]*PRIVATE KEY"      # claves SSH/PGP/TLS
+PATRON="$PATRON|ghp_[A-Za-z0-9]{20}|github_pat_[A-Za-z0-9_]{20}"
+PATRON="$PATRON|eyJ[A-Za-z0-9_-]{10}"               # JWT
+PATRON="$PATRON|AKIA[0-9A-Z]{12}"                   # AWS
+PATRON="$PATRON|AIza[0-9A-Za-z_-]{30}"              # Google
+PATRON="$PATRON|xox[baprs]-[0-9A-Za-z-]{10}"        # Slack
+PATRON="$PATRON|glpat-[0-9A-Za-z_-]{15}"            # GitLab
+PATRON="$PATRON|hf_[A-Za-z0-9]{20}|npm_[A-Za-z0-9]{20}"
+# 'sk-' pedia caracteres detras: si no, casaba con task-, disk-, desk-...
+PATRON="$PATRON|sk-[A-Za-z0-9_-]{16}"
 
 # Falsos positivos ya revisados uno a uno. Un escaner que siempre sale en
 # rojo se deja de leer, asi que el ruido conocido se filtra a proposito.
@@ -535,21 +645,56 @@ fi
 
 # ---------- git ----------
 say "Guardando en git"
-cd "$DOTS"
+
+# Sin '-e', un cd fallido no aborta: 'git init' + 'git add -A' correrian en el
+# directorio desde el que lanzaste el script. Si eso es $HOME, seria un repo
+# de tu home entero, .ssh incluido, con instrucciones de publicarlo.
+cd "$DOTS" || { err "no pude entrar en $DOTS"; exit 1; }
+
+# Un secreto detectado NO se commitea: sacarlo del historial despues obliga a
+# reescribirlo, y el repo es publico.
+if [ "$SECRETOS" = "1" ]; then
+    err "El escaneo encontró coincidencias: NO se hace commit."
+    err "Revísalas arriba. Si son falsos positivos, añádelas a RUIDO."
+    err "Los archivos ya están copiados en $DOTS; nada se ha subido."
+    exit 2
+fi
 
 if [ "$MODO" = "crear" ]; then
     git init -b main -q
+fi
+
+# Estados en los que 'git add -A' hace algo distinto de lo que uno espera.
+if [ -e .git/MERGE_HEAD ] || [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; then
+    err "hay un merge o rebase a medias: un commit ahora los daría por resueltos"
+    err "termínalo o abórtalo y vuelve a ejecutar"
+    exit 1
+fi
+if ! git symbolic-ref -q HEAD >/dev/null; then
+    err "HEAD está desacoplado: el commit quedaría huérfano y no lo subirías"
+    err "vuelve a una rama:  git switch main"
+    exit 1
 fi
 
 git add -A
 if git diff --cached --quiet; then
     ok "sin cambios que guardar"
 else
-    MENSAJE="Migrar a Hyprland + end-4 (illogical-impulse)"
+    MENSAJE="Actualizar configuración"
     [ "$MODO" = "crear" ] && MENSAJE="Configuración inicial: CachyOS + Hyprland + end-4"
-    git -c user.email="${GIT_AUTHOR_EMAIL:-emilio@clip.tech}" \
-        -c user.name="${GIT_AUTHOR_NAME:-$USER}" \
-        commit -q -m "$MENSAJE"
+
+    # 'git -c' PISA la identidad configurada, no es un fallback. Solo se pasa
+    # si git no encuentra ninguna, para no estampar un correo ajeno en los
+    # commits de un repo publico.
+    if git config user.email >/dev/null 2>&1 && git config user.name >/dev/null 2>&1; then
+        git commit -q -m "$MENSAJE"
+    else
+        warn "git no tiene identidad configurada; se usa una por defecto"
+        warn "para cambiarla:  git config --global user.email tu@correo"
+        git -c user.email="${GIT_AUTHOR_EMAIL:-emilio@clip.tech}" \
+            -c user.name="${GIT_AUTHOR_NAME:-${USER:-marcrock}}" \
+            commit -q -m "$MENSAJE"
+    fi
     ok "commit hecho — $(git rev-list --count HEAD) en total"
 fi
 

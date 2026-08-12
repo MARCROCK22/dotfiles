@@ -224,7 +224,7 @@ El bug de NVIDIA lleva **abierto desde agosto de 2024** con 86 comentarios. Sin
 él, el compositor retiene ~1 GiB en vez de ~100 MiB.
 
 Ya lo tienes versionado en `system/nvidia/`, con la regla para `Hyprland` (con H
-mayúscula, que es el nombre real del proceso). `install.sh` lo despliega.
+mayúscula, que es el nombre real del proceso). `install.py` lo despliega.
 
 > Discrepancia sin resolver: la ArchWiki y la wiki de niri usan `"value": 0`; el
 > issue original usa `1`. Nadie explica la diferencia. Empieza con `0`.
@@ -392,15 +392,17 @@ ddcutil detect
 
 ### Configuración específica de máquina
 
-**El monitor.** `custom/general.lua` **no tiene ningún `hl.monitor()`**. Comprueba
-si tu resolución vive en `~/.config/hypr/monitors.lua` (el archivo de
-nwg-displays, que `hyprland.lua` carga pero el script de dotfiles **no
-versiona**). Si está ahí, hay que añadirlo al `dotfiles-setup.sh`.
+**Las pantallas.** No se versionan a propósito: los nombres de output, escalas
+y posiciones son de una máquina concreta. Es el mismo criterio que usabas con
+el `machine.kdl` de niri, y por eso `monitors.lua` está en `.gitignore`.
 
-En el PC harás falta uno nuevo de todos modos:
+En el PC lo generas con:
 ```bash
-hyprctl monitors            # sacar el nombre del output y el modo
+python3 install.py --solo-monitores
 ```
+
+Lee las pantallas reales con `hyprctl monitors all -j` y pregunta modo, escala
+y posición por cada una.
 
 **La ruta del plugin.** `custom/general.lua` tiene
 `/var/cache/hyprpm/marcrock/hyprland-scroll-overview/scrolloverview.so`. Si en el
@@ -460,7 +462,7 @@ RESTAURAR EL SETUP
  20. git clone del repo de dotfiles
  21. Editar pkglist.txt quitando lo del portátil, añadir ddcutil
  22. sudo pacman -S --needed - < pkglist.txt
- 23. ./install.sh
+ 23. python3 install.py
  24. hyprpm add/update/enable scrolloverview
  25. Ajustar hl.monitor() y la ruta del .so
  26. Comparar los parches de quickshell/ con diff ANTES de copiarlos
