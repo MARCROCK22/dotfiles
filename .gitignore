@@ -12,3 +12,5 @@ fish_variables
 *.bak
 .cache/
 *.bak-*
+monitors.lua
+__pycache__/
