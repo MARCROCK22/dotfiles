@@ -112,6 +112,7 @@ lib32-vulkan-intel
 libao
 libdvdcss
 libgsf
+libinput-tools
 libmfx
 libopenraw
 libsonic
@@ -185,8 +186,10 @@ pwvucontrol
 python
 python-defusedxml
 python-docopt
+python-libevdev
 python-packaging
 python-pip
+python-pyudev
 python-yaml
 qtengine
 quickshell-git

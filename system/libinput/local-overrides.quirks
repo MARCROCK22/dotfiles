@@ -1,0 +1,4 @@
+[Nunca desactivar el touchpad al escribir]
+MatchUdevType=keyboard
+MatchName=*AT Translated Set 2 keyboard*
+AttrKeyboardIntegration=external

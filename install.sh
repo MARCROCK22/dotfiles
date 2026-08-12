@@ -25,6 +25,10 @@ if [ -f system/sddm/theme.conf ]; then
     sudo install -Dm644 system/sddm/theme.conf /etc/sddm.conf.d/theme.conf
     echo "    tema de SDDM seleccionado"
 fi
+if [ -f system/libinput/local-overrides.quirks ]; then
+    sudo install -Dm644 system/libinput/local-overrides.quirks /etc/libinput/local-overrides.quirks
+    echo "    quirks de libinput instalados (requiere reiniciar sesion)"
+fi
 if [ -d system/sddm-theme ]; then
     T=/usr/share/sddm/themes/sddm-astronaut-theme
     if [ -d "$T" ]; then
