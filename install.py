@@ -389,23 +389,84 @@ def revisa_plugin():
 
 
 # ------------------------------------------------------------------ main ----
+def conflictos_stow(paquetes):
+    """Archivos que stow no podra enlazar porque ya existen como archivo real.
+
+    Es el caso normal, no una excepcion: el instalador de end-4 crea
+    ~/.config/hypr/custom/*.lua vacios, y stow se niega a pisarlos.
+
+    NO se resuelve con 'stow --adopt'. El manual dice que --adopt mueve el
+    archivo del destino DENTRO del paquete, asi que el keybinds.lua vacio de
+    end-4 sobrescribiria el tuyo en el repo. Es exactamente lo contrario de
+    lo que quieres.
+    """
+    choques = []
+    for p in paquetes:
+        raiz = AQUI / p
+        for origen in raiz.rglob("*"):
+            if not origen.is_file():
+                continue
+            destino = HOME / origen.relative_to(raiz)
+            if destino.is_symlink():
+                continue          # ya lo gestiona stow (o apunta a otro sitio)
+            if destino.exists():
+                choques.append((destino, origen))
+    return choques
+
+
 def paso_stow():
     say("Enlazando con stow")
     if not shutil.which("stow"):
         err("falta stow:  sudo pacman -S stow")
         return False
+
     faltan = [p for p in STOW if not (AQUI / p).is_dir()]
     if faltan:
         warn("no estan en el repo, se omiten: %s" % ", ".join(faltan))
     presentes = [p for p in STOW if (AQUI / p).is_dir()]
+
+    choques = conflictos_stow(presentes)
+    if choques:
+        print()
+        warn("%d archivo(s) ya existen y no son enlaces:" % len(choques))
+        for destino, origen in choques:
+            iguales = ""
+            try:
+                if destino.read_bytes() == origen.read_bytes():
+                    iguales = "  (identico al del repo)"
+                elif destino.stat().st_size == 0:
+                    iguales = "  (vacio)"
+            except OSError:
+                pass
+            print("        %s%s" % (destino, iguales))
+
+        print()
+        print("    stow se niega a continuar mientras esten ahi. Lo normal es")
+        print("    que sean los archivos por defecto que crea end-4.")
+        print()
+        print("    NO uses 'stow --adopt': moveria estos archivos DENTRO del")
+        print("    repo, machacando tu configuracion con la version vacia.")
+        print()
+
+        if not pregunta("¿Respaldarlos y quitarlos para que stow pueda enlazar?", True):
+            err("sin quitarlos, stow no puede continuar")
+            return False
+
+        for destino, _ in choques:
+            copia = respalda(destino)
+            destino.unlink()
+            print("        %s -> %s" % (destino.name, copia.name if copia else "?"))
+        ok("%d archivo(s) apartados" % len(choques))
+
     rc, salida = corre(["stow", *presentes], cwd=str(AQUI))
     if rc == 0:
         ok("enlazados: %s" % ", ".join(presentes))
+        print("        A partir de ahora esos archivos SON el repo: editarlos")
+        print("        edita ~/dotfiles. Recuerda commitear.")
         return True
+
     err("stow fallo:")
     print(salida)
-    print("\n    Suele ser que el archivo destino ya existe y no es un enlace.")
-    print("    Muevelo o borralo y reintenta.")
     return False
 
 
