@@ -1,0 +1,11 @@
+--- a/modules/ii/background/Background.qml
++++ b/modules/ii/background/Background.qml
+@@ -74,7 +74,7 @@
+         // Layer props
+         screen: modelData
+         exclusionMode: ExclusionMode.Ignore
+-        WlrLayershell.layer: (GlobalStates.screenLocked && !scaleAnim.running) ? WlrLayer.Overlay : WlrLayer.Bottom
++        WlrLayershell.layer: (GlobalStates.screenLocked && !scaleAnim.running) ? WlrLayer.Overlay : WlrLayer.Background
+         // WlrLayershell.layer: WlrLayer.Bottom
+         WlrLayershell.namespace: "quickshell:background"
+         anchors {

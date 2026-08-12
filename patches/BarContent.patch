@@ -1,0 +1,133 @@
+--- a/modules/ii/bar/BarContent.qml
++++ b/modules/ii/bar/BarContent.qml
+@@ -89,6 +89,21 @@
+                 colBackground: barLeftSideMouseArea.hovered ? Appearance.colors.colLayer1Hover : ColorUtils.transparentize(Appearance.colors.colLayer1Hover, 1)
+             }
+ 
++            BarGroup {
++                id: leftCenterGroup
++                Layout.alignment: Qt.AlignVCenter
++
++                Resources {
++                    alwaysShowAllResources: root.useShortenedForm === 2
++                    Layout.fillWidth: root.useShortenedForm === 2
++                }
++
++                Media {
++                    visible: root.useShortenedForm < 2
++                    Layout.fillWidth: true
++                }
++            }
++
+             ActiveWindow {
+                 Layout.leftMargin: 10 + (leftSidebarButton.visible ? 0 : Appearance.rounding.screenRounding)
+                 Layout.rightMargin: Appearance.rounding.screenRounding
+@@ -107,26 +122,6 @@
+             horizontalCenter: parent.horizontalCenter
+         }
+         spacing: 4
+-
+-        BarGroup {
+-            id: leftCenterGroup
+-            anchors.verticalCenter: parent.verticalCenter
+-            implicitWidth: root.centerSideModuleWidth
+-
+-            Resources {
+-                alwaysShowAllResources: root.useShortenedForm === 2
+-                Layout.fillWidth: root.useShortenedForm === 2
+-            }
+-
+-            Media {
+-                visible: root.useShortenedForm < 2
+-                Layout.fillWidth: true
+-            }
+-        }
+-
+-        VerticalBarSeparator {
+-            visible: Config.options?.bar.borderless
+-        }
+ 
+         BarGroup {
+             id: middleCenterGroup
+@@ -146,42 +141,6 @@
+                             GlobalStates.overviewOpen = !GlobalStates.overviewOpen;
+                         }
+                     }
+-                }
+-            }
+-        }
+-
+-        VerticalBarSeparator {
+-            visible: Config.options?.bar.borderless
+-        }
+-
+-        MouseArea {
+-            id: rightCenterGroup
+-            anchors.verticalCenter: parent.verticalCenter
+-            implicitWidth: root.centerSideModuleWidth
+-            implicitHeight: rightCenterGroupContent.implicitHeight
+-
+-            onPressed: {
+-                GlobalStates.sidebarRightOpen = !GlobalStates.sidebarRightOpen;
+-            }
+-
+-            BarGroup {
+-                id: rightCenterGroupContent
+-                anchors.fill: parent
+-
+-                ClockWidget {
+-                    showDate: (Config.options.bar.verbose && root.useShortenedForm < 2)
+-                    Layout.alignment: Qt.AlignVCenter
+-                    Layout.fillWidth: true
+-                }
+-
+-                UtilButtons {
+-                    visible: (Config.options.bar.verbose && root.useShortenedForm === 0)
+-                    Layout.alignment: Qt.AlignVCenter
+-                }
+-
+-                BatteryIndicator {
+-                    visible: (root.useShortenedForm < 2 && Battery.available)
+-                    Layout.alignment: Qt.AlignVCenter
+                 }
+             }
+         }
+@@ -316,6 +275,38 @@
+                     }
+                 }
+             }
++            MouseArea {
++                id: rightCenterGroup
++                Layout.alignment: Qt.AlignVCenter
++                implicitWidth: rightCenterGroupContent.implicitWidth
++                implicitHeight: rightCenterGroupContent.implicitHeight
++
++                onPressed: {
++                    GlobalStates.sidebarRightOpen = !GlobalStates.sidebarRightOpen;
++                }
++
++                BarGroup {
++                    id: rightCenterGroupContent
++                    anchors.fill: parent
++
++                    ClockWidget {
++                        showDate: (Config.options.bar.verbose && root.useShortenedForm < 2)
++                        Layout.alignment: Qt.AlignVCenter
++                        Layout.fillWidth: true
++                    }
++
++                    UtilButtons {
++                        visible: (Config.options.bar.verbose && root.useShortenedForm === 0)
++                        Layout.alignment: Qt.AlignVCenter
++                    }
++
++                    BatteryIndicator {
++                        visible: (root.useShortenedForm < 2 && Battery.available)
++                        Layout.alignment: Qt.AlignVCenter
++                    }
++                }
++            }
++
+ 
+             SysTray {
+                 visible: root.useShortenedForm === 0

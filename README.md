@@ -8,9 +8,9 @@ Este repo contiene **solo lo que va encima de end-4**, no end-4 entero.
 
 | Carpeta | Contenido |
 |---|---|
-| `hypr/` | `custom/*.lua` — mis overrides de Hyprland. Y `monitors.lua`, la config de pantallas |
+| `hypr/` | `custom/*.lua` — mis overrides de Hyprland. `monitors.lua` **no** está aquí: es de cada máquina |
 | `illogical-impulse/` | `config.json` del shell (barra, dock, sidebars, temas) |
-| `quickshell/` | Archivos de end-4 **modificados**. `install.py` no los despliega sin preguntar |
+| `patches/` | Diffs sobre archivos de end-4. Los aplica `install.py` con `patch` |
 | `alacritty/` | Terminal |
 | `bin/` | Scripts propios (`recorder`: grabación de pantalla) |
 | `spicetify/` | Tema de Spotify |
@@ -33,10 +33,10 @@ sudo pacman -S --needed - < pkglist.txt
 python3 install.py
 ```
 
-`install.py` es interactivo: enlaza con **stow** todo menos `quickshell/`,
+`install.py` es interactivo: enlaza con **stow** los paquetes de configuración,
 instala los archivos de sistema con sudo, **configura los monitores** leyendo
-`hyprctl monitors -j`, y te guía por los parches de end-4 comparándolos antes de
-tocar nada.
+`hyprctl monitors all -j`, y aplica los parches de end-4 con `patch`, haciendo
+un `--dry-run` de cada uno antes de tocar nada.
 
 > Si vas a instalar en un equipo nuevo, lee primero **[MIGRACION-PC.md](MIGRACION-PC.md)**.
 > Cubre el dual boot con Windows, los ajustes de BIOS y las diferencias de
@@ -58,11 +58,16 @@ una llamada por pantalla.
 
 ## Lo que hay que revisar a mano
 
-**Los parches de `quickshell/`.** Sobrescriben archivos de end-4, así que
-`install.py` no los copia sin preguntar: te dice cuánto difieren, te enseña el
-diff si quieres, y solo entonces pregunta. Si tu versión de end-4 no es la misma
-con la que se generaron, el diff mostrará líneas ajenas y hay que reaplicar los
-cambios a mano.
+**Los parches de `patches/`.** Son diffs sobre archivos de end-4, no copias
+enteras: así `patch` mete el cambio sobre la versión nueva y conservas también
+las mejoras de end-4. `install.py` hace `--dry-run` de cada uno y solo aplica
+los que encajan; si alguno deja de aplicar, te dice qué línea no cuadra.
+
+Dos de los tres son **bugs ajenos**, no personalización: popups recortados en
+los bordes (end-4) y overview gris (plugin scrolloverview). Si se arreglan
+aguas arriba, esos parches se borran.
+
+El ciclo completo tras cada actualización está en **[MANTENIMIENTO.md](MANTENIMIENTO.md)**.
 
 | Archivo | Por qué está modificado |
 |---|---|

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# dotfiles-setup.sh  (v13)
+# dotfiles-setup.sh  (v14)
 # Monta o actualiza el repositorio de dotfiles para CachyOS + Hyprland + end-4.
 #
 # Es idempotente: puedes ejecutarlo las veces que quieras. Si ~/dotfiles ya
@@ -36,13 +36,18 @@
 #         * El escaneo ya no se salta los README de spicetify/, y 'key_id'
 #           deja de tragarse lineas enteras.
 #         * Se rechaza la ejecucion por tuberia (readlink daba /dev/fd/63).
+#   v14 — los parches de end-4 pasan de copias enteras a DIFFS en patches/.
+#         Con copias, cada actualizacion de end-4 obligaba a elegir entre su
+#         version y la tuya. Con diffs, 'patch' aplica tu cambio sobre la suya.
+#         Este script ya solo VERIFICA las firmas; aplicar es cosa de
+#         install.py. Ver MANTENIMIENTO.md.
 #
 # Uso:  bash dotfiles-setup.sh
 #
 
 set -uo pipefail
 
-VERSION="13"
+VERSION="14"
 DOTS="$HOME/dotfiles"
 ESTE="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || true)"
 # Con 'bash <(curl ...)' o 'bash < script', BASH_SOURCE no es un archivo real
@@ -231,7 +236,6 @@ mkdir -p "$DOTS"/{hypr/.config/hypr/custom,alacritty/.config/alacritty}
 mkdir -p "$DOTS"/{bin/.local/bin,spicetify/.config,illogical-impulse/.config/illogical-impulse}
 mkdir -p "$DOTS"/{fish/.config/fish,fastfetch/.config/fastfetch,starship/.config}
 mkdir -p "$DOTS"/{system/nvidia,system/sddm,wallpaper}
-mkdir -p "$DOTS"/quickshell/.config/quickshell/ii/modules/ii/{bar,background}
 ok "directorios listos"
 
 # ---------- configuración de usuario ----------
@@ -272,54 +276,52 @@ copiar "$HOME/.config/fastfetch/config.jsonc"     "$DOTS/fastfetch/.config/fastf
 copiar "$HOME/.config/starship.toml"              "$DOTS/starship/.config"            "starship (prompt)"
 
 # ---------- parches sobre end-4 ----------
-say "Copiando los parches de end-4"
+say "Comprobando los parches de end-4"
 
-# Estos NO son configuración: son archivos del propio end-4 modificados.
-# Se versionan porque cada actualizacion suya los pisa y hay que reaplicarlos.
-# install.py NO los despliega solo, precisamente porque sobrescriben.
+# Ya NO se copian los archivos enteros: el repo guarda DIFFS en patches/.
+# Motivo: con una copia entera, cuando end-4 actualiza el archivo hay que
+# elegir entre su version o la tuya. Con un diff, 'patch' mete tu cambio sobre
+# la version nueva y te quedas con las dos cosas.
+#
+# Aqui solo se VERIFICA que los parches siguen aplicados en tu sistema. Si
+# end-4 piso alguno, la firma desaparece y hay que reaplicarlo:
+#   python3 install.py   (o ver MANTENIMIENTO.md)
 QS="$HOME/.config/quickshell/ii/modules/ii"
-# Cada parche lleva una FIRMA: un fragmento que solo existe en la version
-# parcheada. Si una actualizacion de end-4 pisa el archivo, la firma desaparece
-# y copiarlo al repo borraria el parche en silencio -- que es justo lo que se
-# quiere evitar versionandolos.
 PARCHES=(
-    "bar/BarContent.qml|rightCenterGroupContent.implicitWidth|disposición de barra: recursos a la izquierda, reloj a la derecha"
-    "bar/StyledPopup.qml|Math.max(0, Math.min|bug de end-4: popups recortados en los bordes"
-    "background/Background.qml|WlrLayer.Background|bug de scrolloverview: WlrLayer.Bottom -> Background"
+    "bar/BarContent.qml|rightCenterGroupContent.implicitWidth|disposición de barra"
+    "bar/StyledPopup.qml|Math.max(0, Math.min|popups recortados en los bordes"
+    "background/Background.qml|WlrLayer.Background|overview gris del plugin"
 )
-for entrada in "${PARCHES[@]}"; do
-    ruta="${entrada%%|*}"
-    resto="${entrada#*|}"
-    firma="${resto%%|*}"
-    desc="${resto#*|}"
-    repo_dst="$DOTS/quickshell/.config/quickshell/ii/modules/ii/$ruta"
 
-    if [ ! -f "$QS/$ruta" ]; then
-        warn "no encontrado: $ruta"
-        FALTANTES+=("parche $ruta")
-        continue
-    fi
+# Las copias enteras que guardaba el v13 ya no valen: las sustituyen los diffs.
+if [ -d "$DOTS/quickshell" ]; then
+    rm -rf "${DOTS:?}/quickshell"
+    ok "quickshell/ retirado — lo sustituyen los diffs de patches/"
+fi
 
-    if ! grep -qF "$firma" "$QS/$ruta"; then
-        err "$(basename "$ruta"): el parche NO está aplicado en tu sistema"
-        err "  falta la firma: $firma"
-        if [ -f "$repo_dst" ]; then
-            err "  NO se sobrescribe la versión del repo, que sí lo tiene."
-            AVISOS+=("reaplicar el parche de $(basename "$ruta") — end-4 lo pisó")
-        else
-            AVISOS+=("$(basename "$ruta") sin parchear y sin copia en el repo")
+if [ ! -d "$DOTS/patches" ]; then
+    err "falta la carpeta patches/ en el repo"
+    FALTANTES+=("patches/")
+else
+    for entrada in "${PARCHES[@]}"; do
+        ruta="${entrada%%|*}"
+        resto="${entrada#*|}"
+        firma="${resto%%|*}"
+        desc="${resto#*|}"
+
+        if [ ! -f "$QS/$ruta" ]; then
+            warn "no existe en tu sistema: $ruta"
+            continue
         fi
-        continue
-    fi
-
-    mkdir -p "$(dirname "$repo_dst")"
-    if cp "$QS/$ruta" "$repo_dst"; then
-        ok "$(basename "$ruta") — $desc"
-        COPIADOS=$((COPIADOS + 1))
-    else
-        err "fallo copiando $ruta"
-    fi
-done
+        if grep -qF "$firma" "$QS/$ruta"; then
+            ok "$(basename "$ruta") — $desc"
+        else
+            err "$(basename "$ruta"): el parche NO está aplicado"
+            err "  falta la firma: $firma"
+            AVISOS+=("reaplicar $(basename "$ruta"):  python3 $DOTS/install.py")
+        fi
+    done
+fi
 
 # ---------- wallpaper actual ----------
 say "Detectando wallpaper actual"

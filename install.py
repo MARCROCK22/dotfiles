@@ -44,12 +44,24 @@ AUTO_SI = False
 STOW = ["hypr", "illogical-impulse", "alacritty", "bin",
         "spicetify", "fish", "fastfetch", "starship"]
 
+# (archivo .patch, destino relativo a ~/.config/quickshell/ii, firma, descripcion)
+#
+# Se guardan DIFFS, no copias enteras. Con una copia entera, cuando end-4
+# actualiza el archivo hay que elegir entre su version o la tuya. Con un diff,
+# 'patch' mete tu cambio SOBRE la version nueva y te quedas con las dos cosas;
+# y si el contexto cambio demasiado, falla diciendo que linea no cuadra.
+#
+# La FIRMA es un fragmento que solo existe ya parcheado: sirve para saber si
+# hay que aplicar sin depender de que 'patch' adivine.
 PARCHES = [
-    ("modules/ii/bar/BarContent.qml",
+    ("BarContent.patch", "modules/ii/bar/BarContent.qml",
+     "rightCenterGroupContent.implicitWidth",
      "disposicion de la barra: recursos izq, workspaces centro, reloj der"),
-    ("modules/ii/bar/StyledPopup.qml",
+    ("StyledPopup.patch", "modules/ii/bar/StyledPopup.qml",
+     "Math.max(0, Math.min",
      "bug de end-4: popups recortados cerca de un borde"),
-    ("modules/ii/background/Background.qml",
+    ("Background.patch", "modules/ii/background/Background.qml",
+     "WlrLayer.Background",
      "bug de scrolloverview: WlrLayer.Bottom -> Background"),
 ]
 
@@ -446,60 +458,89 @@ def revisa_parches():
 
     base = HOME / ".config/quickshell/ii"
     if not base.is_dir():
-        warn("no existe %s — ¿instalaste end-4 antes?" % base)
+        warn("no existe %s — instala end-4 antes" % base)
         print("        bash <(curl -s https://ii.clsty.link/get)")
         return
+    if not shutil.which("patch"):
+        err("falta el comando 'patch':  sudo pacman -S patch")
+        return
 
-    print("    Estos archivos SOBRESCRIBEN los de end-4. No se copian solos:")
-    print("    si tu version de end-4 no es la misma con la que se generaron,")
-    print("    te romperian la barra.\n")
+    dir_parches = AQUI / "patches"
+    if not dir_parches.is_dir():
+        warn("no hay carpeta patches/ en el repo")
+        return
 
-    for rel, desc in PARCHES:
-        origen = AQUI / "quickshell/.config/quickshell/ii" / rel
-        actual = base / rel
+    print("    Son cambios SOBRE archivos de end-4. Se aplican con 'patch', asi")
+    print("    que sobreviven a sus actualizaciones mientras el contexto aguante.")
+    print("")
 
-        if not origen.is_file():
-            warn("%s — no esta en el repo" % rel)
+    for archivo, destino_rel, firma, desc in PARCHES:
+        parche = dir_parches / archivo
+        destino = base / destino_rel
+
+        print("    %s" % destino_rel)
+        print("      %s" % desc)
+
+        if not parche.is_file():
+            warn("falta %s en el repo" % archivo)
             continue
-        if not actual.is_file():
-            warn("%s — no existe en tu sistema" % rel)
+        if not destino.is_file():
+            warn("%s no existe en tu sistema" % destino_rel)
             continue
 
         try:
-            iguales = origen.read_bytes() == actual.read_bytes()
+            actual = destino.read_text(encoding="utf-8", errors="replace")
         except OSError as e:
-            warn("%s — no pude leerlo: %s" % (rel, e))
+            warn("no pude leerlo: %s" % e)
             continue
 
-        print("    %s" % rel)
-        print("      %s" % desc)
-
-        if iguales:
-            ok("ya aplicado (identicos)")
+        if firma in actual:
+            ok("ya aplicado (firma presente)")
             continue
 
-        rc, salida, _ = corre(["diff", "-u", str(actual), str(origen)])
-        if rc == 127:
-            warn("no hay 'diff' instalado; no puedo comparar")
-        else:
-            cambios = [l for l in salida.split("\n")
-                       if l[:1] in "+-" and not l.startswith(("+++", "---"))]
-            print("      difieren en %d linea(s)" % len(cambios))
-        print("      ver:  diff -u %s %s" % (actual, origen))
+        # --dry-run dice si aplicaria, sin tocar nada.
+        rc, salida, error = corre(
+            ["patch", "-p1", "--dry-run", "--input", str(parche)],
+            cwd=str(base))
 
-        if salida and pregunta("      ¿Ver el diff completo?", False):
-            print(salida)
+        if rc != 0:
+            err("el parche YA NO aplica limpiamente")
+            for l in (salida or error).split("\n")[:6]:
+                if l.strip():
+                    print("        %s" % l)
+            print("        end-4 cambio esa zona del archivo. Hay que rehacerlo:")
+            print("        1. mira el parche:  cat %s" % parche)
+            print("        2. aplica el cambio a mano en %s" % destino)
+            print("        3. regenera el diff (ver MANTENIMIENTO.md)")
+            continue
 
-        if pregunta("      ¿Aplicar este parche?", False, destructivo=True):
-            copia = respalda(actual)
-            try:
-                shutil.copy2(origen, actual)
-            except OSError as e:
-                err("no pude copiarlo: %s" % e)
-                continue
-            ok("aplicado (respaldo en %s)" % copia)
-        else:
+        ok("aplicaria limpiamente")
+        if not pregunta("      Aplicarlo?", True, destructivo=True):
             warn("omitido")
+            continue
+
+        copia = respalda(destino)
+        rc, salida, error = corre(
+            ["patch", "-p1", "--input", str(parche)], cwd=str(base))
+        if rc != 0:
+            err("fallo al aplicar: %s" % (error or salida))
+            if copia:
+                try:
+                    shutil.copy2(copia, destino)
+                    warn("restaurado desde el respaldo")
+                except OSError:
+                    err("y no pude restaurar: %s" % copia)
+            continue
+
+        # No fiarse del rc: comprobar que la firma quedo de verdad.
+        try:
+            if firma in destino.read_text(encoding="utf-8", errors="replace"):
+                ok("aplicado y verificado (respaldo: %s)" %
+                   (copia.name if copia else "no habia version previa"))
+            else:
+                err("patch dijo que si pero la firma no esta; revisalo")
+        except OSError:
+            warn("aplicado, pero no pude releerlo para verificar")
 
 
 # ---------------------------------------------------------------- plugin ----
