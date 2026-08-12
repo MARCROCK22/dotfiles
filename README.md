@@ -8,16 +8,16 @@ Este repo contiene **solo lo que va encima de end-4**, no end-4 entero.
 
 | Carpeta | Contenido |
 |---|---|
-| `hypr/` | `custom/*.lua` — mis overrides de Hyprland. Lo de end-4 no está aquí |
+| `hypr/` | `custom/*.lua` — mis overrides de Hyprland. Y `monitors.lua`, la config de pantallas |
 | `illogical-impulse/` | `config.json` del shell (barra, dock, sidebars, temas) |
-| `quickshell/` | Archivos de end-4 **modificados**. `install.sh` no los despliega |
+| `quickshell/` | Archivos de end-4 **modificados**. `install.py` no los despliega sin preguntar |
 | `alacritty/` | Terminal |
 | `bin/` | Scripts propios (`recorder`: grabación de pantalla) |
 | `spicetify/` | Tema de Spotify |
 | `fish/` | Shell |
 | `fastfetch/` | Resumen del sistema al abrir la terminal |
 | `starship/` | Prompt |
-| `system/` | Archivos de `/etc` y `/usr/share`, los instala `install.sh` |
+| `system/` | Archivos de `/etc` y `/usr/share`, los instala `install.py` |
 | `wallpaper/` | Fondo actual — de él sale la paleta Material You |
 
 ## Instalación en una máquina nueva
@@ -30,21 +30,39 @@ bash <(curl -s https://ii.clsty.link/get)
 git clone https://github.com/MARCROCK22/dotfiles.git ~/dotfiles
 cd ~/dotfiles
 sudo pacman -S --needed - < pkglist.txt
-./install.sh
+python3 install.py
 ```
 
-`install.sh` enlaza con **stow** todo menos `quickshell/`, e instala los
-archivos de sistema con sudo.
+`install.py` es interactivo: enlaza con **stow** todo menos `quickshell/`,
+instala los archivos de sistema con sudo, **configura los monitores** leyendo
+`hyprctl monitors -j`, y te guía por los parches de end-4 comparándolos antes de
+tocar nada.
 
-## Lo que hay que tocar a mano
+> Si vas a instalar en un equipo nuevo, lee primero **[MIGRACION-PC.md](MIGRACION-PC.md)**.
+> Cubre el dual boot con Windows, los ajustes de BIOS y las diferencias de
+> hardware.
 
-**El monitor.** `hypr/.config/hypr/custom/general.lua` trae el output de la
-máquina donde se generó. Cámbialo por el de esta (`hyprctl monitors`).
+## Configuración de pantallas
+
+La hace `install.py`. Detecta las pantallas conectadas y escribe
+`~/.config/hypr/monitors.lua`, que `hyprland.lua` de end-4 carga **después** de
+`custom/` — así que gana sobre cualquier otra cosa.
+
+```bash
+python3 install.py --solo-monitores
+```
+
+Pregunta modo, escala y posición por cada pantalla, ofreciendo los modos reales
+que reporta el driver. Soporta varios monitores: `hl.monitor()` es acumulativo,
+una llamada por pantalla.
+
+## Lo que hay que revisar a mano
 
 **Los parches de `quickshell/`.** Sobrescriben archivos de end-4, así que
-`install.sh` no los copia: imprime un bucle de `diff` para compararlos antes.
-Si tu versión de end-4 no es la misma con la que se generaron, el diff mostrará
-líneas ajenas y hay que reaplicar los cambios a mano.
+`install.py` no los copia sin preguntar: te dice cuánto difieren, te enseña el
+diff si quieres, y solo entonces pregunta. Si tu versión de end-4 no es la misma
+con la que se generaron, el diff mostrará líneas ajenas y hay que reaplicar los
+cambios a mano.
 
 | Archivo | Por qué está modificado |
 |---|---|
@@ -60,7 +78,11 @@ hyprpm update && hyprpm enable scrolloverview
 ```
 
 La ruta del `.so` en `custom/general.lua` lleva el nombre de usuario dentro
-(`/var/cache/hyprpm/<usuario>/...`). Ajústala si en esta máquina es otro.
+(`/var/cache/hyprpm/<usuario>/...`). **`install.py` lo detecta y ofrece
+corregirlo** si la ruta no existe.
+
+Y recuerda: **cada `hyprpm update` recompila el `.so`**, y tras cada
+actualización de Hyprland hay que repetirlo o el plugin deja de cargar.
 
 ## Notas
 

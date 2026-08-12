@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# dotfiles-setup.sh  (v9)
+# dotfiles-setup.sh  (v11)
 # Monta o actualiza el repositorio de dotfiles para CachyOS + Hyprland + end-4.
 #
 # Es idempotente: puedes ejecutarlo las veces que quieras. Si ~/dotfiles ya
@@ -8,17 +8,21 @@
 #
 # NO borra ni modifica ninguna configuración existente. Todo son copias.
 #
-# Cambio respecto a v8: el setup ya no es Niri + Caffyne. Se recogen los
-# overrides de Hyprland en Lua, la config de illogical-impulse y los tres
-# archivos QML de end-4 que hemos parcheado. Las carpetas niri/ y caffyne/
-# se eliminan del repo.
+# Historial:
+#   v9  — el setup deja de ser Niri + Caffyne. Se recogen los overrides de
+#         Hyprland en Lua, la config de illogical-impulse y los tres archivos
+#         QML de end-4 parcheados. Se eliminan niri/ y caffyne/ del repo.
+#   v10 — el escaneo de secretos deja de dar falsos positivos en cada pasada.
+#   v11 — install.sh se sustituye por install.py, que ya no se genera aqui
+#         sino que es un archivo real del repo. Se recogen monitors.lua y
+#         workspaces.lua, donde vive la configuracion de pantallas.
 #
 # Uso:  bash dotfiles-setup.sh
 #
 
 set -uo pipefail
 
-VERSION="10"
+VERSION="11"
 DOTS="$HOME/dotfiles"
 ESTE="$(readlink -f "${BASH_SOURCE[0]}")"
 FALTANTES=()
@@ -161,6 +165,17 @@ fi
 
 copiar "$HOME/.config/illogical-impulse/config.json" \
        "$DOTS/illogical-impulse/.config/illogical-impulse" "illogical-impulse / config.json"
+
+# monitors.lua lo carga hyprland.lua de end-4 DESPUES de custom/, asi que es
+# donde vive la configuracion de pantallas. Es especifico de cada maquina, pero
+# se versiona igual: install.py lo regenera con --solo-monitores.
+copiar_opcional "$HOME/.config/hypr/monitors.lua" "$DOTS/hypr/.config/hypr" "hypr / monitors.lua"
+copiar_opcional "$HOME/.config/hypr/workspaces.lua" "$DOTS/hypr/.config/hypr" "hypr / workspaces.lua"
+
+if [ ! -f "$HOME/.config/hypr/monitors.lua" ] && ! grep -rqs 'hl.monitor(' "$HOME/.config/hypr/custom/"; then
+    warn "no hay hl.monitor() en ningun sitio: tu resolucion no esta fijada"
+    AVISOS+=("generar monitors.lua:  python3 ~/dotfiles/install.py --solo-monitores")
+fi
 
 copiar "$HOME/.config/alacritty/alacritty.toml"   "$DOTS/alacritty/.config/alacritty" "alacritty"
 copiar "$HOME/.local/bin/recorder"                "$DOTS/bin/.local/bin"              "script recorder"
@@ -310,106 +325,29 @@ fi
 
 # ---------- install.sh ----------
 say "Generando archivos del repo"
-cat > "$DOTS/install.sh" <<'INSTALL_EOF'
-#!/usr/bin/env bash
-#
-# Despliega estos dotfiles en una máquina nueva.
-# Uso:  ./install.sh
-#
-set -euo pipefail
-cd "$(dirname "$0")"
 
-echo "==> Paquetes"
-echo "    Para instalarlos todos:"
-echo "      sudo pacman -S --needed - < pkglist.txt"
-echo
-echo "    Y ANTES de nada, los dotfiles de end-4:"
-echo "      bash <(curl -s https://ii.clsty.link/get)"
-echo "    Este repo solo trae los cambios ENCIMA de lo suyo."
+# install.sh se sustituyo por install.py (v11). El instalador ya no se genera
+# desde aqui: es un archivo real del repo, versionado como cualquier otro.
+# Motivo: configurar monitores necesita leer JSON, preguntar y emitir Lua, y
+# eso dentro de un heredoc de bash era insostenible.
+if [ -f "$DOTS/install.sh" ]; then
+    rm -f "$DOTS/install.sh"
+    ok "install.sh eliminado — lo sustituye install.py"
+fi
 
-echo "==> Enlazando configuración de usuario con stow"
-command -v stow >/dev/null || { echo "Falta stow: sudo pacman -S stow"; exit 1; }
-stow hypr illogical-impulse alacritty bin spicetify fish fastfetch starship
-# quickshell/ NO se enlaza: ver el apartado de parches más abajo.
-
-echo "==> Archivos de sistema (sudo)"
-if [ -f system/nvidia/50-limit-free-buffer-pool-in-wayland-compositors.json ]; then
-    sudo install -Dm644 \
-      system/nvidia/50-limit-free-buffer-pool-in-wayland-compositors.json \
-      /etc/nvidia/nvidia-application-profiles-rc.d/50-limit-free-buffer-pool-in-wayland-compositors.json
-    echo "    perfil de VRAM de Nvidia instalado"
-fi
-if [ -f system/sddm/theme.conf ]; then
-    sudo install -Dm644 system/sddm/theme.conf /etc/sddm.conf.d/theme.conf
-    echo "    tema de SDDM seleccionado"
-fi
-if [ -f system/libinput/local-overrides.quirks ]; then
-    sudo install -Dm644 system/libinput/local-overrides.quirks /etc/libinput/local-overrides.quirks
-    echo "    quirks de libinput instalados (requiere reiniciar sesion)"
-fi
-if [ -d system/sddm-theme ]; then
-    T=/usr/share/sddm/themes/sddm-astronaut-theme
-    if [ -d "$T" ]; then
-        [ -f system/sddm-theme/metadata.desktop ] && sudo install -Dm644 system/sddm-theme/metadata.desktop "$T/metadata.desktop"
-        for f in system/sddm-theme/Themes/*.conf; do
-            [ -f "$f" ] && sudo install -Dm644 "$f" "$T/Themes/$(basename "$f")"
-        done
-        echo "    personalizacion del tema sddm-astronaut restaurada"
+if [ -f "$DOTS/install.py" ]; then
+    chmod +x "$DOTS/install.py"
+    if command -v python3 >/dev/null && python3 -m py_compile "$DOTS/install.py" 2>/dev/null; then
+        ok "install.py presente y compila"
+        rm -rf "$DOTS/__pycache__"
     else
-        echo "    AVISO: falta el paquete sddm-astronaut-theme, instalalo antes"
+        warn "install.py presente pero no compila — revisalo"
+        AVISOS+=("install.py no compila")
     fi
+else
+    err "falta install.py en el repo"
+    FALTANTES+=("install.py")
 fi
-
-echo "==> Wallpaper"
-if compgen -G "wallpaper/*" > /dev/null; then
-    mkdir -p ~/Pictures/wallpapers
-    cp wallpaper/* ~/Pictures/wallpapers/
-    echo "    copiado a ~/Pictures/wallpapers"
-    echo "    Aplicalo con Ctrl+Super+T para que se regenere la paleta."
-fi
-
-echo
-echo "==> PARCHES DE end-4 — paso manual, a propósito"
-cat <<'PARCHES'
-    quickshell/ contiene archivos de end-4 MODIFICADOS. No se despliegan
-    solos porque SOBRESCRIBEN los suyos, y si tu version de end-4 no es la
-    misma con la que se generaron, te romperian la barra.
-
-    Compara antes de copiar nada:
-
-      for f in modules/ii/bar/BarContent.qml \
-               modules/ii/bar/StyledPopup.qml \
-               modules/ii/background/Background.qml; do
-          echo "--- $f"
-          diff "$HOME/.config/quickshell/ii/$f" \
-               "quickshell/.config/quickshell/ii/$f"
-      done
-
-    Si el diff solo muestra los cambios que esperas, copia. Si muestra
-    lineas ajenas, tu end-4 es de otra version: reaplica los cambios a mano.
-
-    Que hace cada uno:
-      BarContent.qml    disposicion de la barra (recursos izq, reloj der)
-      StyledPopup.qml   bug de end-4: popups recortados cerca de los bordes
-      Background.qml    bug de scrolloverview: WlrLayer.Bottom -> Background
-PARCHES
-
-echo
-echo "==> Plugin del overview"
-echo "    hyprpm add https://github.com/yayuuu/hyprland-scroll-overview.git"
-echo "    hyprpm update && hyprpm enable scrolloverview"
-echo
-echo "    La ruta del .so en custom/general.lua lleva TU usuario:"
-echo "      /var/cache/hyprpm/<usuario>/hyprland-scroll-overview/scrolloverview.so"
-echo "    Ajustala si el usuario de esta maquina es otro."
-
-echo
-echo "==> Monitor"
-echo "    custom/general.lua trae el output de la maquina anterior."
-echo "    Cambialo por el de esta:  hyprctl monitors"
-INSTALL_EOF
-chmod +x "$DOTS/install.sh"
-ok "install.sh"
 
 # El propio script vive en el repo: así solo existe una versión canónica.
 if [ "$ESTE" != "$(readlink -f "$DOTS/dotfiles-setup.sh" 2>/dev/null)" ]; then
