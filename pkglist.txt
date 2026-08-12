@@ -56,11 +56,13 @@ dmraid
 dnsmasq
 dolphin
 dosfstools
+dotconf
 duf
 e2fsprogs
 efibootmgr
 efitools
 egl-wayland
+espeak-ng
 ethtool
 exfatprogs
 eza
@@ -107,10 +109,13 @@ lib32-nvidia-utils
 lib32-opencl-nvidia
 lib32-vulkan-icd-loader
 lib32-vulkan-intel
+libao
 libdvdcss
 libgsf
 libmfx
 libopenraw
+libsonic
+libspeechd
 libva-nvidia-driver
 libyaml
 limine
@@ -161,6 +166,7 @@ papirus-folders
 papirus-icon-theme
 paru
 pavucontrol
+pcaudiolib
 perl
 pipewire
 pipewire-alsa
@@ -200,6 +206,7 @@ slurp
 smartmontools
 snapper
 sof-firmware
+speech-dispatcher
 spicetify-cli
 spicetify-marketplace-bin
 spotify-launcher
