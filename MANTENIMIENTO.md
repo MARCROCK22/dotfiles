@@ -34,6 +34,18 @@ sería garantizar que las dos copias se separen. Los otros 2 —`StyledPopup.qml
 y `Background.qml`, los arreglos de bugs ajenos— sí están fijos en el array
 `EXTRA_ARCHIVOS` de `dotfiles-setup.sh`, porque nadie más los gestiona.
 
+### `select_design.py` NO está en el repo
+
+Son 460 KB que llevan **embebidos** los mismos 14 `.qml` que el repo ya guarda
+sueltos: dos copias de lo mismo, garantizadas a separarse. Está en
+`.gitignore` para que no vuelva a entrar por descuido.
+
+Vive fuera del repo — `~/Descargas`, `~/.local/bin`, donde lo tengas — y
+`dotfiles-setup.sh` solo lo **consulta** al recoger, cogiendo el más reciente
+si hay varias copias. Sin él no se puede recoger la shell (el script lo dice y
+omite ese paso); **desplegar sí funciona sin él**, porque `install.py` solo
+necesita el `MANIFEST`.
+
 ### El precio de no usar parches, dicho claro
 
 Un diff que ya no encaja **falla a gritos**. Un reemplazo **pisa en silencio**.
