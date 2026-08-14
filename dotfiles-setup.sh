@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# dotfiles-setup.sh  (v14)
+# dotfiles-setup.sh  (v15)
 # Monta o actualiza el repositorio de dotfiles para CachyOS + Hyprland + end-4.
 #
 # Es idempotente: puedes ejecutarlo las veces que quieras. Si ~/dotfiles ya
@@ -41,13 +41,40 @@
 #         version y la tuya. Con diffs, 'patch' aplica tu cambio sobre la suya.
 #         Este script ya solo VERIFICA las firmas; aplicar es cosa de
 #         install.py. Ver MANTENIMIENTO.md.
+#   v15 — MARCHA ATRAS DELIBERADA sobre v14: se vuelve a archivos ENTEROS, y
+#         ahora son 14 (los 4 que se tocan de end-4 + 10 widgets nuevos).
+#         El motivo de v14 sigue siendo cierto: un reemplazo pisa en SILENCIO
+#         los cambios de end-4, mientras que un diff falla a gritos. A cambio,
+#         el despliegue es determinista y no hay diffs que regenerar a mano.
+#         Compensaciones, porque el riesgo es real:
+#         * MANIFEST con el sha256 de cada archivo; install.py NO sobrescribe
+#           a ciegas: si lo instalado no coincide, ensena el diff y pregunta.
+#         * VERSION con el commit de end-4 contra el que se recogio.
+#         * Las FIRMAS desaparecen: el diseno 1 elimina legitimamente
+#           'rightCenterGroupContent', asi que daban falsa alarma.
+#         * La lista de .qml se le pregunta a select_design.py --archivos, en
+#           vez de duplicarla aqui.
+#         Y lo que encontro la revision adversarial de este mismo cambio:
+#         * Se recoge a un TEMPORAL y solo se sustituye si estan los 14. Antes
+#           borraba quickshell/ del repo ANTES de copiar, asi que un archivo
+#           ausente en la maquina (caso normal tras './setup install' de end-4)
+#           desaparecia del repo y 'git add -A' publicaba el borrado.
+#         * Rutas con '..' o absolutas se rechazan en los dos lados. En
+#           install.py escribian FUERA de la shell diciendo "escrito".
+#         * select_design.py se busca por FECHA, no por orden: la copia del
+#           repo ganaba siempre y usaba una lista vieja sin decirlo.
+#         * El error de select_design.py ya no va a /dev/null.
+#         * install.py: --solo-shell, para actualizar la shell en la maquina
+#           ORIGEN sin pasar por stow (pasar por stow la enlazaba y dejaba el
+#           recolector inservible para siempre). Y si el respaldo falla, ya no
+#           sobrescribe.
 #
 # Uso:  bash dotfiles-setup.sh
 #
 
 set -uo pipefail
 
-VERSION="14"
+VERSION="15"
 DOTS="$HOME/dotfiles"
 ESTE="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || true)"
 # Con 'bash <(curl ...)' o 'bash < script', BASH_SOURCE no es un archivo real
@@ -181,6 +208,11 @@ if [ ${#ENLAZADOS[@]} -gt 0 ]; then
     echo "    Si has cambiado configuración, ya está en el repo. Solo falta:"
     echo "        cd $DOTS && git add -A && git status && git commit"
     echo
+    echo "    OJO, con una excepción: los 14 archivos de quickshell/ NO van por"
+    echo "    stow. Son copias en ~/.config/quickshell/ii, no enlaces, así que"
+    echo "    'git add -A' no ve nada de lo que cambies ahí. En esta máquina la"
+    echo "    shell solo se DESPLIEGA (install.py --solo-shell), no se recoge."
+    echo
     echo "    Este script es para la máquina ORIGEN, la que aún no está enlazada."
     exit 1
 fi
@@ -275,52 +307,198 @@ copiar_dir "$HOME/.config/spicetify" "$DOTS/spicetify/.config/spicetify" "spicet
 copiar "$HOME/.config/fastfetch/config.jsonc"     "$DOTS/fastfetch/.config/fastfetch" "fastfetch"
 copiar "$HOME/.config/starship.toml"              "$DOTS/starship/.config"            "starship (prompt)"
 
-# ---------- parches sobre end-4 ----------
-say "Comprobando los parches de end-4"
+# ---------- archivos de la shell (reemplazo completo) ----------
+say "Recogiendo los archivos de end-4"
 
-# Ya NO se copian los archivos enteros: el repo guarda DIFFS en patches/.
-# Motivo: con una copia entera, cuando end-4 actualiza el archivo hay que
-# elegir entre su version o la tuya. Con un diff, 'patch' mete tu cambio sobre
-# la version nueva y te quedas con las dos cosas.
+# v15: se acabaron los diffs. El repo guarda los archivos ENTEROS.
 #
-# Aqui solo se VERIFICA que los parches siguen aplicados en tu sistema. Si
-# end-4 piso alguno, la firma desaparece y hay que reaplicarlo:
-#   python3 install.py   (o ver MANTENIMIENTO.md)
-QS="$HOME/.config/quickshell/ii/modules/ii"
-PARCHES=(
-    "bar/BarContent.qml|rightCenterGroupContent.implicitWidth|disposición de barra"
-    "bar/StyledPopup.qml|Math.max(0, Math.min|popups recortados en los bordes"
-    "background/Background.qml|WlrLayer.Background|overview gris del plugin"
+# Por que se cambio: un diff que ya no encaja falla a gritos, pero obliga a
+# regenerarlo a mano cada vez que end-4 toca la zona. Con archivos enteros el
+# despliegue es determinista: lo que hay en el repo es exactamente lo que
+# acaba en la maquina.
+#
+# El precio, y hay que decirlo claro: un reemplazo PISA EN SILENCIO los
+# cambios de end-4. Por eso el repo guarda tambien el sha256 de cada archivo
+# (MANIFEST) y la version de la shell contra la que se hizo (VERSION), e
+# install.py se niega a sobrescribir a ciegas: si lo instalado no coincide ni
+# con lo nuestro ni con lo ultimo recogido, ensena el diff y pregunta.
+#
+# La lista de los 12 archivos que gestiona select_design.py NO se escribe
+# aqui: se le pregunta a el. Existen a la vez como .qml en disco y embebidos
+# dentro del script, y dos listas separadas acaban separandose.
+
+QS="$HOME/.config/quickshell/ii"
+DEST_QS="$DOTS/quickshell"
+
+# Los dos que select_design.py no gestiona: son arreglos de bugs ajenos.
+EXTRA_ARCHIVOS=(
+    "reemplazo	modules/ii/bar/StyledPopup.qml"
+    "reemplazo	modules/ii/background/Background.qml"
 )
 
-# Las copias enteras que guardaba el v13 ya no valen: las sustituyen los diffs.
-if [ -d "$DOTS/quickshell" ]; then
-    rm -rf "${DOTS:?}/quickshell"
-    ok "quickshell/ retirado — lo sustituyen los diffs de patches/"
-fi
-
-if [ ! -d "$DOTS/patches" ]; then
-    err "falta la carpeta patches/ en el repo"
-    FALTANTES+=("patches/")
+if [ ! -d "$QS" ]; then
+    err "no existe $QS — ¿esta end-4 instalado?"
+    FALTANTES+=("quickshell/ii")
 else
-    for entrada in "${PARCHES[@]}"; do
-        ruta="${entrada%%|*}"
-        resto="${entrada#*|}"
-        firma="${resto%%|*}"
-        desc="${resto#*|}"
-
-        if [ ! -f "$QS/$ruta" ]; then
-            warn "no existe en tu sistema: $ruta"
-            continue
-        fi
-        if grep -qF "$firma" "$QS/$ruta"; then
-            ok "$(basename "$ruta") — $desc"
-        else
-            err "$(basename "$ruta"): el parche NO está aplicado"
-            err "  falta la firma: $firma"
-            AVISOS+=("reaplicar $(basename "$ruta"):  python3 $DOTS/install.py")
+    # select_design.py tiene que estar para saber que recoger, y ademas se
+    # versiona: es la herramienta que reescribe BarContent.qml.
+    # Se coge el MAS RECIENTE, no el primero que aparezca. Con "el primero",
+    # la copia del repo ganaba siempre: bajabas una version nueva a
+    # ~/Descargas, la ejecutabas, y el recolector seguia preguntandole a la
+    # vieja que archivos gestiona — con una lista desactualizada y sin que
+    # nada lo dijera.
+    SEL=""
+    for cand in "$DOTS/select_design.py" "$HOME/select_design.py" \
+                "$HOME/Descargas/select_design.py" "$HOME/Downloads/select_design.py"; do
+        [ -f "$cand" ] || continue
+        if [ -z "$SEL" ] || [ "$cand" -nt "$SEL" ]; then
+            SEL="$cand"
         fi
     done
+
+    if [ -z "$SEL" ]; then
+        err "no encuentro select_design.py"
+        err "  buscado en: \$DOTS, \$HOME, ~/Descargas, ~/Downloads"
+        err "  sin el no se que .qml recoger; se omite la shell entera"
+        FALTANTES+=("select_design.py")
+    else
+        [ "$SEL" != "$DOTS/select_design.py" ] && cp "$SEL" "$DOTS/select_design.py"
+        chmod +x "$DOTS/select_design.py" 2>/dev/null || true
+        ok "select_design.py ($(wc -l < "$DOTS/select_design.py") lineas)"
+
+        # El error NO se tira a /dev/null: si la copia es vieja y no tiene la
+        # bandera --archivos, argparse escribe el motivo en stderr, y sin el
+        # esto solo diria "no devolvio nada". Un 2>/dev/null tapando un fallo
+        # real ya ha costado horas en este repo.
+        SEL_ERR="$DOTS/.select_design.err.$$"
+        LISTA="$(python3 "$DOTS/select_design.py" --archivos 2>"$SEL_ERR")"
+        SEL_RC=$?
+        if [ "$SEL_RC" -ne 0 ] || [ -z "$LISTA" ]; then
+            err "select_design.py --archivos fallo (rc=$SEL_RC)"
+            if [ -s "$SEL_ERR" ]; then
+                head -4 "$SEL_ERR" | while IFS= read -r l; do echo "        $l"; done
+            fi
+            err "¿es una copia vieja, anterior a la bandera --archivos?"
+            rm -f "$SEL_ERR"
+            FALTANTES+=("lista de archivos de la shell")
+        else
+            rm -f "$SEL_ERR"
+            # Se monta en un TEMPORAL y solo se sustituye si todo salio bien.
+            # Es el mismo patron que copiar_dir() (mas arriba) y por el mismo
+            # motivo: borrar primero y copiar despues significa que un archivo
+            # ausente en la maquina desaparece del repo, y el 'git add -A' del
+            # final publica el borrado sin que nada lo compruebe — ni N_FALLO
+            # ni FALTANTES, que solo se imprimen DESPUES del commit.
+            #
+            # No es teorico: './setup install' de end-4 reinstala el arbol ii/
+            # y se lleva por delante los 10 .qml nuevos. Recoger justo despues
+            # habria vaciado quickshell/ del repo y commiteado el borrado.
+            TMP_QS="${DEST_QS}.tmp.$$"
+            rm -rf "$TMP_QS"
+            mkdir -p "$TMP_QS"
+
+            MAN_TMP="$TMP_QS/MANIFEST"
+            : > "$MAN_TMP"
+            N_OK=0; N_FALLO=0
+
+            while IFS=$'\t' read -r tipo ruta; do
+                # Un \r al final convierte la ruta en inexistente y el fallo
+                # es mudo: "no esta en tu sistema" para un archivo que si
+                # esta. Pasa si select_design.py corre en Windows (python
+                # traduce \n a \r\n en stdout) o si el MANIFEST viaja por ahi.
+                ruta="${ruta%$'\r'}"
+                tipo="${tipo%$'\r'}"
+                [ -n "$ruta" ] || continue
+                # Una ruta con '..' o absoluta escribiria FUERA del repo. Hoy
+                # no puede pasar (las genera select_design.py), pero el coste
+                # de comprobarlo es cero y el de no hacerlo es escribir en
+                # sitios arbitrarios sin enterarse.
+                case "$ruta" in
+                    /*|*..*)
+                        err "ruta sospechosa, omitida: $ruta"
+                        N_FALLO=$((N_FALLO + 1))
+                        continue
+                        ;;
+                esac
+                origen="$QS/$ruta"
+                if [ ! -f "$origen" ]; then
+                    warn "no esta en tu sistema: $ruta"
+                    FALTANTES+=("quickshell/$ruta")
+                    N_FALLO=$((N_FALLO + 1))
+                    continue
+                fi
+                mkdir -p "$TMP_QS/$(dirname "$ruta")"
+                SUMA="$(sha256sum "$origen" 2>/dev/null | cut -d' ' -f1)"
+                if [ -z "$SUMA" ]; then
+                    err "no pude calcular el sha256 de $ruta"
+                    N_FALLO=$((N_FALLO + 1))
+                elif cp "$origen" "$TMP_QS/$ruta"; then
+                    printf '%s\t%s\t%s\n' "$tipo" "$SUMA" "$ruta" >> "$MAN_TMP"
+                    N_OK=$((N_OK + 1))
+                else
+                    err "no pude copiar $ruta"
+                    N_FALLO=$((N_FALLO + 1))
+                fi
+            done < <(printf '%s\n' "$LISTA"; printf '%s\n' "${EXTRA_ARCHIVOS[@]}")
+
+            # VERSION: contra que end-4 se hizo esto. Si la shell se instalo
+            # con ./setup no hay .git y no se puede saber el commit; se anota
+            # asi en vez de inventarlo.
+            {
+                echo "# Version de end-4/dots-hyprland contra la que se recogieron"
+                echo "# estos archivos. Fijarla = git checkout <commit> antes de"
+                echo "# ./setup install. El propio ./setup NO tiene bandera de version."
+                if [ -d "$HOME/.config/quickshell/.git" ]; then
+                    echo "commit=$(git -C "$HOME/.config/quickshell" rev-parse HEAD 2>/dev/null || echo desconocido)"
+                    echo "fecha=$(git -C "$HOME/.config/quickshell" log -1 --format=%ad --date=short 2>/dev/null || echo desconocida)"
+                elif [ -d "$HOME/dots-hyprland/.git" ]; then
+                    echo "commit=$(git -C "$HOME/dots-hyprland" rev-parse HEAD 2>/dev/null || echo desconocido)"
+                    echo "fecha=$(git -C "$HOME/dots-hyprland" log -1 --format=%ad --date=short 2>/dev/null || echo desconocida)"
+                else
+                    echo "commit=desconocido"
+                    echo "fecha=desconocida"
+                    echo "# No hay checkout git de end-4: se instalo con ./setup."
+                    echo "# Si quieres fijarla de verdad, clona el repo, haz checkout"
+                    echo "# del commit que quieras y corre ./setup install desde ahi."
+                fi
+                # Sin marca de tiempo a proposito: cambiaria en cada pasada y
+                # 'git add -A' veria siempre una diferencia, generando un
+                # commit por ejecucion aunque no hubiera cambiado nada. La
+                # fecha de recogida ya la registra el propio commit.
+            } > "$TMP_QS/VERSION"
+
+            # EL CAMBIAZO. Solo si los 14 estan: un archivo que falte casi
+            # siempre significa que la maquina esta a medias (end-4 recien
+            # reinstalado, o los widgets sin poner), no que lo hayas borrado
+            # a proposito. Borrar a proposito se refleja igual, porque
+            # entonces select_design.py tampoco lo lista y no cuenta como
+            # fallo. Ante la duda, se conserva lo que ya habia en el repo.
+            if [ "$N_FALLO" -gt 0 ]; then
+                rm -rf "$TMP_QS"
+                err "$N_FALLO de $((N_OK + N_FALLO)) archivo(s) no se pudieron recoger"
+                err "quickshell/ del repo NO se toca: se conserva lo que ya habia"
+                err "Si acabas de reinstalar end-4, repon los widgets con:"
+                err "  python3 $DOTS/select_design.py --widgets"
+                AVISOS+=("quickshell/ NO se actualizo: faltaban $N_FALLO archivo(s)")
+            else
+                rm -rf "${DEST_QS:?}"
+                if mv "$TMP_QS" "$DEST_QS"; then
+                    ok "$N_OK archivo(s) recogidos en quickshell/ (+ MANIFEST y VERSION)"
+                    COPIADOS=$((COPIADOS + 1))
+                else
+                    err "no pude sustituir quickshell/ en el repo"
+                    FALTANTES+=("quickshell/")
+                fi
+            fi
+        fi
+    fi
+fi
+
+# patches/ queda muerto con el reemplazo completo. NO se borra solo: borrar
+# cosas del repo sin pedirlo es justo lo que rompio el repo en su dia.
+if [ -d "$DOTS/patches" ]; then
+    warn "patches/ ya no se usa (v15 guarda archivos enteros)"
+    AVISOS+=("borrar patches/ cuando confirmes que va bien:  rm -rf ~/dotfiles/patches")
 fi
 
 # ---------- wallpaper actual ----------
@@ -565,7 +743,8 @@ Configuración de escritorio para **CachyOS + Hyprland + end-4 (illogical-impuls
 |---|---|
 | `hypr/` | `custom/*.lua` — mis overrides de Hyprland. Lo de end-4 no está aquí |
 | `illogical-impulse/` | `config.json` del shell |
-| `quickshell/` | Archivos de end-4 **modificados**. `install.py` pregunta antes |
+| `quickshell/` | Archivos **enteros** de la shell: 4 que pisan a end-4 y 10 widgets propios. `MANIFEST` (sha256) + `VERSION` (commit de end-4) |
+| `select_design.py` | Cambia la disposición de la barra y enciende/apaga los widgets. Es quien escribe `BarContent.qml` |
 | `alacritty/` | Terminal |
 | `bin/` | Scripts propios (`recorder`: grabación de pantalla) |
 | `spicetify/` | Tema de Spotify |
@@ -592,8 +771,13 @@ python3 install.py
 
 - **Las pantallas**: no se versionan. Las genera `install.py` en cada máquina,
   en `~/.config/hypr/monitors.lua` (como el `machine.kdl` de niri).
-- **Los parches de `quickshell/`**: sobrescriben archivos de end-4. `install.py`
-  te enseña el diff y pregunta uno por uno.
+- **Los archivos de `quickshell/`**: se copian **enteros** encima de los de
+  end-4. `install.py` compara el sha256 contra `MANIFEST` y solo pregunta
+  cuando lo instalado no coincide — que es la señal de que end-4 cambió ese
+  archivo, o de que lo editaste tú.
+- **Tras actualizar end-4**: revisa los 4 marcados `reemplazo` en `MANIFEST`.
+  Un reemplazo pisa los cambios de upstream **en silencio**; ese es el precio
+  de no usar parches, y por eso existe la comprobación de hash.
 - **El plugin del overview**: se instala con `hyprpm`, no con pacman. La ruta
   del `.so` en `custom/general.lua` lleva el nombre de usuario dentro.
 
