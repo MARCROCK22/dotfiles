@@ -14,3 +14,7 @@ fish_variables
 *.bak-*
 monitors.lua
 __pycache__/
+
+# La herramienta de disenos de barra: 460 KB que llevan embebidos los
+# mismos 14 .qml que quickshell/ ya guarda sueltos. Vive fuera del repo.
+select_design.py
