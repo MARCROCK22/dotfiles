@@ -31,3 +31,5 @@ if status is-interactive
         alias ssh 'kitten ssh'
     end
 end
+export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
