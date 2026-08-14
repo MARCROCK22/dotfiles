@@ -52,10 +52,13 @@
 #         * VERSION con el commit de end-4 contra el que se recogio.
 #         * Las FIRMAS desaparecen: el diseno 1 elimina legitimamente
 #           'rightCenterGroupContent', asi que daban falsa alarma.
-#         * La lista de .qml se le pregunta a select_design.py --archivos, en
-#           vez de duplicarla aqui. Ese script NO se versiona: son 460 KB
-#           que ya duplican, embebidos, los 14 .qml que el repo guarda
-#           sueltos. Vive fuera del repo y solo se le consulta.
+#         * La lista de los 14 esta AQUI, en ARCHIVOS_SHELL. Primero se le
+#           preguntaba a 'select_design.py --archivos' para no tener dos
+#           listas; el precio era peor: recoger dependia de un archivo de
+#           460 KB que vive fuera del repo, y en la primera ejecucion real la
+#           copia de la maquina era anterior a esa bandera (rc=2) y la shell
+#           no se recogio. Ahora ese script solo se usa para CONTRASTAR y
+#           avisar si las listas divergen; nunca bloquea.
 #         Y lo que encontro la revision adversarial de este mismo cambio:
 #         * Se recoge a un TEMPORAL y solo se sustituye si estan los 14. Antes
 #           borraba quickshell/ del repo ANTES de copiar, asi que un archivo
@@ -332,167 +335,175 @@ say "Recogiendo los archivos de end-4"
 QS="$HOME/.config/quickshell/ii"
 DEST_QS="$DOTS/quickshell"
 
-# Los dos que select_design.py no gestiona: son arreglos de bugs ajenos.
-EXTRA_ARCHIVOS=(
+# LA LISTA VA AQUI, EXPLICITA, y son 14 lineas.
+#
+# Antes se le preguntaba a 'select_design.py --archivos'. La idea era no
+# tener dos listas que se separaran, pero el precio era peor: recoger
+# pasaba a depender de un archivo de 460 KB que vive FUERA del repo. En la
+# primera ejecucion real la copia de la maquina era anterior a esa bandera,
+# argparse devolvio rc=2, y la shell no se recogio. Catorce lineas no
+# justifican esa dependencia.
+#
+# Si anades un widget, anadelo aqui. Si hay un select_design.py a mano que
+# sepa responder, se usa solo para CONTRASTAR y avisar si han divergido.
+#
+#   reemplazo - el archivo EXISTE en end-4 y lo pisamos
+#   nuevo     - no existe en end-4; no puede destruir nada suyo
+ARCHIVOS_SHELL=(
+    "reemplazo	modules/ii/bar/BarContent.qml"
+    "reemplazo	modules/common/Config.qml"
     "reemplazo	modules/ii/bar/StyledPopup.qml"
     "reemplazo	modules/ii/background/Background.qml"
+    "nuevo	modules/ii/bar/AlertLine.qml"
+    "nuevo	modules/ii/bar/GpuWidget.qml"
+    "nuevo	modules/ii/bar/IslandGroup.qml"
+    "nuevo	modules/ii/bar/OgeeBackground.qml"
+    "nuevo	modules/ii/bar/Pulse.qml"
+    "nuevo	modules/ii/bar/QuickControls.qml"
+    "nuevo	modules/ii/bar/SpaceNav.qml"
+    "nuevo	modules/ii/bar/SysReadouts.qml"
+    "nuevo	modules/ii/bar/TapeMinimap.qml"
+    "nuevo	modules/ii/bar/WindowShelf.qml"
 )
 
 if [ ! -d "$QS" ]; then
     err "no existe $QS — ¿esta end-4 instalado?"
     FALTANTES+=("quickshell/ii")
 else
-    # select_design.py hace falta para saber QUE recoger, pero NO se versiona:
-    # son 460 KB que ya duplican, embebidos, los mismos 14 .qml que el repo
-    # guarda sueltos. Vive fuera del repo y aqui solo se le consulta.
-    #
-    # $DOTS NO esta en la busqueda a proposito: una copia suelta ahi la
-    # recogeria el 'git add -A' del final y volveria a entrar en el repo por
-    # la puerta de atras. Ademas esta en .gitignore.
-    #
-    # Se coge el MAS RECIENTE de los candidatos: si tienes dos copias, la
-    # vieja daria una lista desactualizada sin decir nada.
+    # La lista es fija (arriba). select_design.py solo se usa para CONTRASTAR,
+    # nunca para bloquear: hacer que recoger dependiera de un archivo de 460 KB
+    # que vive fuera del repo fallo en la primera ejecucion real, porque la
+    # copia de la maquina era anterior a la bandera --archivos.
     SEL=""
-    for cand in "$HOME/select_design.py" "$HOME/Descargas/select_design.py" \
-                "$HOME/Downloads/select_design.py" "$HOME/.local/bin/select_design.py"; do
+    for cand in "$HOME/select_design.py" "$HOME/Descargas/select_design.py"                 "$HOME/Downloads/select_design.py" "$HOME/.local/bin/select_design.py"; do
         [ -f "$cand" ] || continue
         if [ -z "$SEL" ] || [ "$cand" -nt "$SEL" ]; then
             SEL="$cand"
         fi
     done
-
-    if [ -z "$SEL" ]; then
-        err "no encuentro select_design.py"
-        err "  buscado en: \$HOME, ~/Descargas, ~/Downloads, ~/.local/bin"
-        err "  no se versiona a proposito (460 KB que duplican los 14 .qml),"
-        err "  pero hace falta para saber que recoger. Sin el se omite la shell."
-        FALTANTES+=("select_design.py (fuera del repo)")
-    else
-        ok "lista pedida a $SEL"
-
-        # El error NO se tira a /dev/null: si la copia es vieja y no tiene la
-        # bandera --archivos, argparse escribe el motivo en stderr, y sin el
-        # esto solo diria "no devolvio nada". Un 2>/dev/null tapando un fallo
-        # real ya ha costado horas en este repo.
-        SEL_ERR="${TMPDIR:-/tmp}/.select_design.err.$$"
-        LISTA="$(python3 "$SEL" --archivos 2>"$SEL_ERR")"
-        SEL_RC=$?
-        if [ "$SEL_RC" -ne 0 ] || [ -z "$LISTA" ]; then
-            err "select_design.py --archivos fallo (rc=$SEL_RC)"
-            if [ -s "$SEL_ERR" ]; then
-                head -4 "$SEL_ERR" | while IFS= read -r l; do echo "        $l"; done
-            fi
-            err "¿es una copia vieja, anterior a la bandera --archivos?"
-            rm -f "$SEL_ERR"
-            FALTANTES+=("lista de archivos de la shell")
+    if [ -n "$SEL" ]; then
+        LISTA_SEL="$(python3 "$SEL" --archivos 2>/dev/null | tr -d '\r' | sort)"
+        if [ -z "$LISTA_SEL" ]; then
+            warn "$(basename "$SEL") no sabe responder --archivos (copia vieja)"
+            warn "  da igual: la lista de este script es la que manda"
+        elif [ "$LISTA_SEL" = "$(printf '%s\n' "${ARCHIVOS_SHELL[@]}" | sort)" ]; then
+            ok "la lista cuadra con la de $(basename "$SEL")"
         else
-            rm -f "$SEL_ERR"
-            # Se monta en un TEMPORAL y solo se sustituye si todo salio bien.
-            # Es el mismo patron que copiar_dir() (mas arriba) y por el mismo
-            # motivo: borrar primero y copiar despues significa que un archivo
-            # ausente en la maquina desaparece del repo, y el 'git add -A' del
-            # final publica el borrado sin que nada lo compruebe — ni N_FALLO
-            # ni FALTANTES, que solo se imprimen DESPUES del commit.
-            #
-            # No es teorico: './setup install' de end-4 reinstala el arbol ii/
-            # y se lleva por delante los 10 .qml nuevos. Recoger justo despues
-            # habria vaciado quickshell/ del repo y commiteado el borrado.
-            TMP_QS="${DEST_QS}.tmp.$$"
-            rm -rf "$TMP_QS"
-            mkdir -p "$TMP_QS"
+            warn "la lista de este script y la de $SEL NO coinciden"
+            warn "  ¿has anadido un widget y no lo has puesto en ARCHIVOS_SHELL?"
+            AVISOS+=("las dos listas de archivos de la shell han divergido")
+        fi
+    fi
 
-            MAN_TMP="$TMP_QS/MANIFEST"
-            : > "$MAN_TMP"
-            N_OK=0; N_FALLO=0
+    if [ ${#ARCHIVOS_SHELL[@]} -eq 0 ]; then
+        err "ARCHIVOS_SHELL esta vacia (bug de este script)"
+        FALTANTES+=("lista de archivos de la shell")
+    else
+        # Se monta en un TEMPORAL y solo se sustituye si todo salio bien.
+        # Es el mismo patron que copiar_dir() (mas arriba) y por el mismo
+        # motivo: borrar primero y copiar despues significa que un archivo
+        # ausente en la maquina desaparece del repo, y el 'git add -A' del
+        # final publica el borrado sin que nada lo compruebe — ni N_FALLO
+        # ni FALTANTES, que solo se imprimen DESPUES del commit.
+        #
+        # No es teorico: './setup install' de end-4 reinstala el arbol ii/
+        # y se lleva por delante los 10 .qml nuevos. Recoger justo despues
+        # habria vaciado quickshell/ del repo y commiteado el borrado.
+        TMP_QS="${DEST_QS}.tmp.$$"
+        rm -rf "$TMP_QS"
+        mkdir -p "$TMP_QS"
 
-            while IFS=$'\t' read -r tipo ruta; do
-                # Un \r al final convierte la ruta en inexistente y el fallo
-                # es mudo: "no esta en tu sistema" para un archivo que si
-                # esta. Pasa si select_design.py corre en Windows (python
-                # traduce \n a \r\n en stdout) o si el MANIFEST viaja por ahi.
-                ruta="${ruta%$'\r'}"
-                tipo="${tipo%$'\r'}"
-                [ -n "$ruta" ] || continue
-                # Una ruta con '..' o absoluta escribiria FUERA del repo. Hoy
-                # no puede pasar (las genera select_design.py), pero el coste
-                # de comprobarlo es cero y el de no hacerlo es escribir en
-                # sitios arbitrarios sin enterarse.
-                case "$ruta" in
-                    /*|*..*)
-                        err "ruta sospechosa, omitida: $ruta"
-                        N_FALLO=$((N_FALLO + 1))
-                        continue
-                        ;;
-                esac
-                origen="$QS/$ruta"
-                if [ ! -f "$origen" ]; then
-                    warn "no esta en tu sistema: $ruta"
-                    FALTANTES+=("quickshell/$ruta")
+        MAN_TMP="$TMP_QS/MANIFEST"
+        : > "$MAN_TMP"
+        N_OK=0; N_FALLO=0
+
+        while IFS=$'\t' read -r tipo ruta; do
+            # Un \r al final convierte la ruta en inexistente y el fallo
+            # es mudo: "no esta en tu sistema" para un archivo que si
+            # esta. Pasa si select_design.py corre en Windows (python
+            # traduce \n a \r\n en stdout) o si el MANIFEST viaja por ahi.
+            ruta="${ruta%$'\r'}"
+            tipo="${tipo%$'\r'}"
+            [ -n "$ruta" ] || continue
+            # Una ruta con '..' o absoluta escribiria FUERA del repo. Hoy
+            # no puede pasar (las genera select_design.py), pero el coste
+            # de comprobarlo es cero y el de no hacerlo es escribir en
+            # sitios arbitrarios sin enterarse.
+            case "$ruta" in
+                /*|*..*)
+                    err "ruta sospechosa, omitida: $ruta"
                     N_FALLO=$((N_FALLO + 1))
                     continue
-                fi
-                mkdir -p "$TMP_QS/$(dirname "$ruta")"
-                SUMA="$(sha256sum "$origen" 2>/dev/null | cut -d' ' -f1)"
-                if [ -z "$SUMA" ]; then
-                    err "no pude calcular el sha256 de $ruta"
-                    N_FALLO=$((N_FALLO + 1))
-                elif cp "$origen" "$TMP_QS/$ruta"; then
-                    printf '%s\t%s\t%s\n' "$tipo" "$SUMA" "$ruta" >> "$MAN_TMP"
-                    N_OK=$((N_OK + 1))
-                else
-                    err "no pude copiar $ruta"
-                    N_FALLO=$((N_FALLO + 1))
-                fi
-            done < <(printf '%s\n' "$LISTA"; printf '%s\n' "${EXTRA_ARCHIVOS[@]}")
-
-            # VERSION: contra que end-4 se hizo esto. Si la shell se instalo
-            # con ./setup no hay .git y no se puede saber el commit; se anota
-            # asi en vez de inventarlo.
-            {
-                echo "# Version de end-4/dots-hyprland contra la que se recogieron"
-                echo "# estos archivos. Fijarla = git checkout <commit> antes de"
-                echo "# ./setup install. El propio ./setup NO tiene bandera de version."
-                if [ -d "$HOME/.config/quickshell/.git" ]; then
-                    echo "commit=$(git -C "$HOME/.config/quickshell" rev-parse HEAD 2>/dev/null || echo desconocido)"
-                    echo "fecha=$(git -C "$HOME/.config/quickshell" log -1 --format=%ad --date=short 2>/dev/null || echo desconocida)"
-                elif [ -d "$HOME/dots-hyprland/.git" ]; then
-                    echo "commit=$(git -C "$HOME/dots-hyprland" rev-parse HEAD 2>/dev/null || echo desconocido)"
-                    echo "fecha=$(git -C "$HOME/dots-hyprland" log -1 --format=%ad --date=short 2>/dev/null || echo desconocida)"
-                else
-                    echo "commit=desconocido"
-                    echo "fecha=desconocida"
-                    echo "# No hay checkout git de end-4: se instalo con ./setup."
-                    echo "# Si quieres fijarla de verdad, clona el repo, haz checkout"
-                    echo "# del commit que quieras y corre ./setup install desde ahi."
-                fi
-                # Sin marca de tiempo a proposito: cambiaria en cada pasada y
-                # 'git add -A' veria siempre una diferencia, generando un
-                # commit por ejecucion aunque no hubiera cambiado nada. La
-                # fecha de recogida ya la registra el propio commit.
-            } > "$TMP_QS/VERSION"
-
-            # EL CAMBIAZO. Solo si los 14 estan: un archivo que falte casi
-            # siempre significa que la maquina esta a medias (end-4 recien
-            # reinstalado, o los widgets sin poner), no que lo hayas borrado
-            # a proposito. Borrar a proposito se refleja igual, porque
-            # entonces select_design.py tampoco lo lista y no cuenta como
-            # fallo. Ante la duda, se conserva lo que ya habia en el repo.
-            if [ "$N_FALLO" -gt 0 ]; then
-                rm -rf "$TMP_QS"
-                err "$N_FALLO de $((N_OK + N_FALLO)) archivo(s) no se pudieron recoger"
-                err "quickshell/ del repo NO se toca: se conserva lo que ya habia"
-                err "Si acabas de reinstalar end-4, repon los widgets con:"
-                err "  python3 $SEL --widgets"
-                AVISOS+=("quickshell/ NO se actualizo: faltaban $N_FALLO archivo(s)")
+                    ;;
+            esac
+            origen="$QS/$ruta"
+            if [ ! -f "$origen" ]; then
+                warn "no esta en tu sistema: $ruta"
+                FALTANTES+=("quickshell/$ruta")
+                N_FALLO=$((N_FALLO + 1))
+                continue
+            fi
+            mkdir -p "$TMP_QS/$(dirname "$ruta")"
+            SUMA="$(sha256sum "$origen" 2>/dev/null | cut -d' ' -f1)"
+            if [ -z "$SUMA" ]; then
+                err "no pude calcular el sha256 de $ruta"
+                N_FALLO=$((N_FALLO + 1))
+            elif cp "$origen" "$TMP_QS/$ruta"; then
+                printf '%s\t%s\t%s\n' "$tipo" "$SUMA" "$ruta" >> "$MAN_TMP"
+                N_OK=$((N_OK + 1))
             else
-                rm -rf "${DEST_QS:?}"
-                if mv "$TMP_QS" "$DEST_QS"; then
-                    ok "$N_OK archivo(s) recogidos en quickshell/ (+ MANIFEST y VERSION)"
-                    COPIADOS=$((COPIADOS + 1))
-                else
-                    err "no pude sustituir quickshell/ en el repo"
-                    FALTANTES+=("quickshell/")
-                fi
+                err "no pude copiar $ruta"
+                N_FALLO=$((N_FALLO + 1))
+            fi
+        done < <(printf '%s\n' "${ARCHIVOS_SHELL[@]}")
+
+        # VERSION: contra que end-4 se hizo esto. Si la shell se instalo
+        # con ./setup no hay .git y no se puede saber el commit; se anota
+        # asi en vez de inventarlo.
+        {
+            echo "# Version de end-4/dots-hyprland contra la que se recogieron"
+            echo "# estos archivos. Fijarla = git checkout <commit> antes de"
+            echo "# ./setup install. El propio ./setup NO tiene bandera de version."
+            if [ -d "$HOME/.config/quickshell/.git" ]; then
+                echo "commit=$(git -C "$HOME/.config/quickshell" rev-parse HEAD 2>/dev/null || echo desconocido)"
+                echo "fecha=$(git -C "$HOME/.config/quickshell" log -1 --format=%ad --date=short 2>/dev/null || echo desconocida)"
+            elif [ -d "$HOME/dots-hyprland/.git" ]; then
+                echo "commit=$(git -C "$HOME/dots-hyprland" rev-parse HEAD 2>/dev/null || echo desconocido)"
+                echo "fecha=$(git -C "$HOME/dots-hyprland" log -1 --format=%ad --date=short 2>/dev/null || echo desconocida)"
+            else
+                echo "commit=desconocido"
+                echo "fecha=desconocida"
+                echo "# No hay checkout git de end-4: se instalo con ./setup."
+                echo "# Si quieres fijarla de verdad, clona el repo, haz checkout"
+                echo "# del commit que quieras y corre ./setup install desde ahi."
+            fi
+            # Sin marca de tiempo a proposito: cambiaria en cada pasada y
+            # 'git add -A' veria siempre una diferencia, generando un
+            # commit por ejecucion aunque no hubiera cambiado nada. La
+            # fecha de recogida ya la registra el propio commit.
+        } > "$TMP_QS/VERSION"
+
+        # EL CAMBIAZO. Solo si los 14 estan: un archivo que falte casi
+        # siempre significa que la maquina esta a medias (end-4 recien
+        # reinstalado, o los widgets sin poner), no que lo hayas borrado
+        # a proposito. Borrar a proposito se refleja igual, porque
+        # entonces select_design.py tampoco lo lista y no cuenta como
+        # fallo. Ante la duda, se conserva lo que ya habia en el repo.
+        if [ "$N_FALLO" -gt 0 ]; then
+            rm -rf "$TMP_QS"
+            err "$N_FALLO de $((N_OK + N_FALLO)) archivo(s) no se pudieron recoger"
+            err "quickshell/ del repo NO se toca: se conserva lo que ya habia"
+            err "Si acabas de reinstalar end-4, repon los widgets con:"
+            err "  python3 <donde-tengas>/select_design.py --widgets"
+            AVISOS+=("quickshell/ NO se actualizo: faltaban $N_FALLO archivo(s)")
+        else
+            rm -rf "${DEST_QS:?}"
+            if mv "$TMP_QS" "$DEST_QS"; then
+                ok "$N_OK archivo(s) recogidos en quickshell/ (+ MANIFEST y VERSION)"
+                COPIADOS=$((COPIADOS + 1))
+            else
+                err "no pude sustituir quickshell/ en el repo"
+                FALTANTES+=("quickshell/")
             fi
         fi
     fi
