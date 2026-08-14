@@ -28,23 +28,24 @@ los 8 widgets (`AlertLine`, `GpuWidget`, `Pulse`, `QuickControls`, `SpaceNav`,
 `SysReadouts`, `TapeMinimap`, `WindowShelf`) y 2 componentes de diseño
 (`IslandGroup`, `OgeeBackground`).
 
-**12 de los 14 no están escritos en ningún script**: salen de
-`select_design.py --archivos`, que es quien los gestiona. Duplicar esa lista
-sería garantizar que las dos copias se separen. Los otros 2 —`StyledPopup.qml`
-y `Background.qml`, los arreglos de bugs ajenos— sí están fijos en el array
-`EXTRA_ARCHIVOS` de `dotfiles-setup.sh`, porque nadie más los gestiona.
+La lista está en el array **`ARCHIVOS_SHELL`** de `dotfiles-setup.sh`, catorce
+líneas explícitas. **Si añades un widget, añádelo ahí.**
 
-### `select_design.py` NO está en el repo
+### `select_design.py` NO está en el repo, y tampoco hace falta
 
 Son 460 KB que llevan **embebidos** los mismos 14 `.qml` que el repo ya guarda
 sueltos: dos copias de lo mismo, garantizadas a separarse. Está en
 `.gitignore` para que no vuelva a entrar por descuido.
 
-Vive fuera del repo — `~/Descargas`, `~/.local/bin`, donde lo tengas — y
-`dotfiles-setup.sh` solo lo **consulta** al recoger, cogiendo el más reciente
-si hay varias copias. Sin él no se puede recoger la shell (el script lo dice y
-omite ese paso); **desplegar sí funciona sin él**, porque `install.py` solo
-necesita el `MANIFEST`.
+Primero intenté que `dotfiles-setup.sh` le pidiera la lista, para no tener dos
+sitios donde mantenerla. Salió mal en la primera ejecución real: la copia de la
+máquina era anterior a la bandera `--archivos`, `argparse` devolvió `rc=2` y la
+shell **no se recogió**. Catorce líneas no justifican que recoger dependa de un
+archivo que vive fuera del repo.
+
+Ahora si hay un `select_design.py` a mano se usa solo para **contrastar** las
+dos listas y avisar si han divergido. **Nunca bloquea**: si falta, o es viejo,
+lo dice y sigue.
 
 ### El precio de no usar parches, dicho claro
 
