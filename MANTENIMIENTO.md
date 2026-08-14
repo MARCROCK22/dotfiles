@@ -1,106 +1,115 @@
 # Mantenimiento
 
 Este repo no es autónomo: va **encima** de [end-4/dots-hyprland](https://github.com/end-4/dots-hyprland)
-y de un plugin de Hyprland. Los dos se actualizan por su cuenta, y hay tres
-archivos suyos modificados a propósito.
+y de un plugin de Hyprland. Los dos se actualizan por su cuenta. De end-4 hay
+**4 archivos pisados a propósito**, y encima se añaden **10 propios**.
 
 Esto es lo que hay que hacer cuando alguno se actualiza.
 
 ---
 
-## Los tres parches
+## Los 14 archivos de la shell
 
-Viven en `patches/` como **diffs**, no como copias del archivo entero.
+Desde **v15 no hay parches**. `quickshell/` guarda los archivos **enteros**,
+más un `MANIFEST` con el sha256 de cada uno y un `VERSION` con el commit de
+end-4 contra el que se recogieron.
 
-| Parche | Archivo de end-4 | Qué cambia | Por qué |
-|---|---|---|---|
-| `BarContent.patch` | `modules/ii/bar/BarContent.qml` | Recursos y media a la izquierda, workspaces solos en el centro, reloj y batería a la derecha | Personalización propia |
-| `StyledPopup.patch` | `modules/ii/bar/StyledPopup.qml` | Acota `margins.left` a los límites de la pantalla | **Bug de end-4**: centra el popup sobre el widget sin comprobar los bordes, así que cualquier widget cerca de un lado se recorta |
-| `Background.patch` | `modules/ii/background/Background.qml` | `WlrLayer.Bottom` → `WlrLayer.Background` | **Bug del plugin scrolloverview**: solo dibuja el nivel `LAYER_BACKGROUND`, y end-4 pinta en `bottom`, así que el overview salía gris |
+**4 marcados `reemplazo`** — existen en end-4 y los pisamos:
 
-Los dos últimos son fallos ajenos, no gustos. Si algún día se arreglan aguas
-arriba, esos parches se pueden borrar.
+| Archivo | Qué cambia | Por qué |
+|---|---|---|
+| `modules/ii/bar/BarContent.qml` | La disposición entera de la barra | Personalización. **Lo escribe `select_design.py`**, no se edita a mano |
+| `modules/common/Config.qml` | Declara las claves de los 10 widgets nuevos | `Config.options` es un `JsonAdapter` de propiedades estáticas: sin declarar, la clave vale `undefined` para siempre |
+| `modules/ii/bar/StyledPopup.qml` | Acota `margins.left` a la pantalla | **Bug de end-4**: centra el popup sin comprobar los bordes, así que un widget cerca de un lado se recorta |
+| `modules/ii/background/Background.qml` | `WlrLayer.Bottom` → `WlrLayer.Background` | **Bug del plugin scrolloverview**: solo dibuja `LAYER_BACKGROUND` y end-4 pinta en `bottom`, así que el overview salía gris |
 
-### Por qué diffs y no copias
+**10 marcados `nuevo`** — no existen en end-4, no pueden destruir nada suyo:
+los 8 widgets (`AlertLine`, `GpuWidget`, `Pulse`, `QuickControls`, `SpaceNav`,
+`SysReadouts`, `TapeMinimap`, `WindowShelf`) y 2 componentes de diseño
+(`IslandGroup`, `OgeeBackground`).
 
-Con una copia entera del archivo, cada actualización de end-4 obliga a elegir:
-te quedas su versión y pierdes tu cambio, o te quedas la tuya y pierdes sus
-arreglos. Con un diff, `patch` mete tu cambio **sobre** la versión nueva y te
-quedas con las dos cosas. Y si el contexto cambió demasiado, falla diciendo qué
-línea no cuadra, en vez de sobrescribir en silencio.
+**12 de los 14 no están escritos en ningún script**: salen de
+`select_design.py --archivos`, que es quien los gestiona. Duplicar esa lista
+sería garantizar que las dos copias se separen. Los otros 2 —`StyledPopup.qml`
+y `Background.qml`, los arreglos de bugs ajenos— sí están fijos en el array
+`EXTRA_ARCHIVOS` de `dotfiles-setup.sh`, porque nadie más los gestiona.
 
-### La firma
+### El precio de no usar parches, dicho claro
 
-Cada parche tiene un fragmento que **solo existe en la versión parcheada**:
+Un diff que ya no encaja **falla a gritos**. Un reemplazo **pisa en silencio**.
+Si end-4 arregla un bug en `BarContent.qml` y tú copias el tuyo encima, su
+arreglo desaparece sin avisar.
 
-| Archivo | Firma |
-|---|---|
-| `BarContent.qml` | `rightCenterGroupContent.implicitWidth` |
-| `StyledPopup.qml` | `Math.max(0, Math.min` |
-| `Background.qml` | `WlrLayer.Background` |
+Lo que lo compensa es el `MANIFEST`: `install.py` compara el sha256 de lo que
+tienes instalado contra el del repo, y **solo hay tres desenlaces**:
 
-Sirve para saber en un `grep` si el parche sigue puesto, sin depender de que
-`patch` adivine. `dotfiles-setup.sh` la comprueba en cada pasada.
+- **coinciden** → ya está puesto, no toca nada;
+- **el archivo no existe y es `nuevo`** → lo copia sin preguntar;
+- **difieren** → enseña el diff y **pregunta**, con la respuesta por defecto
+  en **no**.
+
+Ese tercer caso es la señal de que end-4 cambió el archivo, o de que lo
+editaste tú. Las dos merecen que pares a mirar.
 
 ---
 
 ## Después de actualizar end-4
 
+**En la máquina ORIGEN** (la que recoge, donde nunca corriste `install.py`):
+
 ```bash
 cd ~/dotfiles
+python3 install.py --solo-shell
+```
+
+`--solo-shell` existe precisamente para esto. **No uses `install.py` a secas
+aquí**: pasa por `stow`, que convierte tus archivos en enlaces al repo, y a
+partir de ese momento `dotfiles-setup.sh` aborta por su guarda y te quedas sin
+máquina desde la que recoger.
+
+**En una máquina destino** (ya desplegada con `install.py`):
+
+```bash
+cd ~/dotfiles && git pull
 python3 install.py --sin-monitores --sin-sistema
 ```
 
-Llega al paso de parches, comprueba las firmas y aplica los que falten. Para
-cada uno hace `patch --dry-run` primero: si no aplicaría, no toca nada.
+En los dos casos compara los 14. Salidas posibles:
 
-Salidas posibles:
+**`N al dia`** — coinciden con el repo. La actualización no los tocó.
 
-**`ya aplicado (firma presente)`** — la actualización no tocó ese archivo.
+**`lo instalado NO es lo del repo`** — end-4 reescribió ese archivo. Mira el
+diff que sale justo debajo antes de responder:
 
-**`aplicaría limpiamente`** — end-4 lo actualizó pero tu cambio sigue encajando.
-Di que sí y listo.
+- Si su cambio no te importa → **sí**, tu versión gana.
+- Si su cambio te interesa → **no**, y lo integras a mano en tu archivo.
+  Después vuelve a recoger con `dotfiles-setup.sh`.
 
-**`el parche YA NO aplica limpiamente`** — end-4 reescribió esa zona. Toca a
-mano:
+Para `BarContent.qml` hay un atajo: no lo edites a mano. Vuelve a aplicar tu
+diseño con `python3 select_design.py <n>` y recoge.
 
-```bash
-cat patches/StyledPopup.patch                       # ver qué hacía
-nano ~/.config/quickshell/ii/modules/ii/bar/StyledPopup.qml
-```
-
-Y después **regenerar el diff** (siguiente sección).
+**Revisa siempre los 4 `reemplazo`** tras actualizar end-4. Los 10 `nuevo` no
+necesitan revisión: upstream no tiene nada que perder ahí.
 
 ---
 
-## Regenerar un parche
+## Fijar la versión de end-4
 
-Hace falta cuando cambias tú el archivo, o cuando has tenido que reaplicar a
-mano porque el parche dejó de encajar.
+`./setup` de end-4 **no tiene bandera de versión** — sus subcomandos son
+`install|uninstall|exp-update|exp-merge|resetfirstrun|checkdeps|virtmon`.
+Fijarla significa elegir el commit antes de instalar:
 
 ```bash
-cd /tmp
-# 1. La versión limpia de end-4, sin tus cambios
-gh api "repos/end-4/dots-hyprland/contents/dots/.config/quickshell/ii/modules/ii/bar/StyledPopup.qml" \
-   -H "Accept: application/vnd.github.raw" > original.qml
-
-# 2. El diff contra la tuya
-diff -u original.qml ~/.config/quickshell/ii/modules/ii/bar/StyledPopup.qml \
-  | sed -e '1s|.*|--- a/modules/ii/bar/StyledPopup.qml|' \
-        -e '2s|.*|+++ b/modules/ii/bar/StyledPopup.qml|' \
-  > ~/dotfiles/patches/StyledPopup.patch
-
-# 3. Comprobarlo antes de fiarte
-cd ~/.config/quickshell/ii
-patch -p1 --dry-run --reverse --input ~/dotfiles/patches/StyledPopup.patch
+git clone https://github.com/end-4/dots-hyprland
+cd dots-hyprland
+git checkout <commit-de-quickshell/VERSION>
+./setup install
 ```
 
-El `--reverse` del paso 3 comprueba que el parche **revierte** limpiamente lo
-que tienes puesto, que es la forma de confirmar que el diff describe justo tu
-cambio y nada más.
-
-Las rutas del `sed` deben empezar por `a/` y `b/` desde
-`~/.config/quickshell/ii`, porque `install.py` aplica con `patch -p1` desde ahí.
+`quickshell/VERSION` dice contra cuál se recogieron los 14 archivos. Si
+end-4 se instaló con el `curl` de una línea no queda checkout git y el commit
+sale como `desconocido`; el `MANIFEST` sigue funcionando igual, porque compara
+hashes y no versiones.
 
 ---
 
@@ -137,6 +146,24 @@ mismo y dejaría el repo vacío. En esa máquina basta con:
 ```bash
 cd ~/dotfiles && git add -A && git status && git commit
 ```
+
+**Con una excepción importante: los 14 archivos de `quickshell/`.** No van por
+stow — son **copias** en `~/.config/quickshell/ii`, no enlaces. Así que en una
+máquina desplegada `git add -A` **no ve nada** de lo que cambies ahí, ni
+siquiera si aplicas otro diseño con `select_design.py`.
+
+Consecuencia práctica: **la shell solo se recoge en la máquina origen**. En las
+demás se despliega (`install.py --solo-shell`) y punto. Si cambias el diseño en
+una máquina desplegada y lo quieres versionar, cópialo a mano al repo:
+
+```bash
+cp ~/.config/quickshell/ii/modules/ii/bar/BarContent.qml \
+   ~/dotfiles/quickshell/modules/ii/bar/BarContent.qml
+sha256sum ~/dotfiles/quickshell/modules/ii/bar/BarContent.qml   # y actualiza MANIFEST
+```
+
+Es incómodo a propósito: si las dos máquinas recogieran, el repo dejaría de
+tener una única fuente de verdad.
 
 ---
 
