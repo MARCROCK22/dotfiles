@@ -1,0 +1,8 @@
+# Version de end-4/dots-hyprland contra la que se recogieron
+# estos archivos. Fijarla = git checkout <commit> antes de
+# ./setup install. El propio ./setup NO tiene bandera de version.
+commit=desconocido
+fecha=desconocida
+# No hay checkout git de end-4: se instalo con ./setup.
+# Si quieres fijarla de verdad, clona el repo, haz checkout
+# del commit que quieras y corre ./setup install desde ahi.
