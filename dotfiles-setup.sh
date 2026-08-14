@@ -53,7 +53,9 @@
 #         * Las FIRMAS desaparecen: el diseno 1 elimina legitimamente
 #           'rightCenterGroupContent', asi que daban falsa alarma.
 #         * La lista de .qml se le pregunta a select_design.py --archivos, en
-#           vez de duplicarla aqui.
+#           vez de duplicarla aqui. Ese script NO se versiona: son 460 KB
+#           que ya duplican, embebidos, los 14 .qml que el repo guarda
+#           sueltos. Vive fuera del repo y solo se le consulta.
 #         Y lo que encontro la revision adversarial de este mismo cambio:
 #         * Se recoge a un TEMPORAL y solo se sustituye si estan los 14. Antes
 #           borraba quickshell/ del repo ANTES de copiar, asi que un archivo
@@ -340,16 +342,19 @@ if [ ! -d "$QS" ]; then
     err "no existe $QS — ¿esta end-4 instalado?"
     FALTANTES+=("quickshell/ii")
 else
-    # select_design.py tiene que estar para saber que recoger, y ademas se
-    # versiona: es la herramienta que reescribe BarContent.qml.
-    # Se coge el MAS RECIENTE, no el primero que aparezca. Con "el primero",
-    # la copia del repo ganaba siempre: bajabas una version nueva a
-    # ~/Descargas, la ejecutabas, y el recolector seguia preguntandole a la
-    # vieja que archivos gestiona — con una lista desactualizada y sin que
-    # nada lo dijera.
+    # select_design.py hace falta para saber QUE recoger, pero NO se versiona:
+    # son 460 KB que ya duplican, embebidos, los mismos 14 .qml que el repo
+    # guarda sueltos. Vive fuera del repo y aqui solo se le consulta.
+    #
+    # $DOTS NO esta en la busqueda a proposito: una copia suelta ahi la
+    # recogeria el 'git add -A' del final y volveria a entrar en el repo por
+    # la puerta de atras. Ademas esta en .gitignore.
+    #
+    # Se coge el MAS RECIENTE de los candidatos: si tienes dos copias, la
+    # vieja daria una lista desactualizada sin decir nada.
     SEL=""
-    for cand in "$DOTS/select_design.py" "$HOME/select_design.py" \
-                "$HOME/Descargas/select_design.py" "$HOME/Downloads/select_design.py"; do
+    for cand in "$HOME/select_design.py" "$HOME/Descargas/select_design.py" \
+                "$HOME/Downloads/select_design.py" "$HOME/.local/bin/select_design.py"; do
         [ -f "$cand" ] || continue
         if [ -z "$SEL" ] || [ "$cand" -nt "$SEL" ]; then
             SEL="$cand"
@@ -358,20 +363,19 @@ else
 
     if [ -z "$SEL" ]; then
         err "no encuentro select_design.py"
-        err "  buscado en: \$DOTS, \$HOME, ~/Descargas, ~/Downloads"
-        err "  sin el no se que .qml recoger; se omite la shell entera"
-        FALTANTES+=("select_design.py")
+        err "  buscado en: \$HOME, ~/Descargas, ~/Downloads, ~/.local/bin"
+        err "  no se versiona a proposito (460 KB que duplican los 14 .qml),"
+        err "  pero hace falta para saber que recoger. Sin el se omite la shell."
+        FALTANTES+=("select_design.py (fuera del repo)")
     else
-        [ "$SEL" != "$DOTS/select_design.py" ] && cp "$SEL" "$DOTS/select_design.py"
-        chmod +x "$DOTS/select_design.py" 2>/dev/null || true
-        ok "select_design.py ($(wc -l < "$DOTS/select_design.py") lineas)"
+        ok "lista pedida a $SEL"
 
         # El error NO se tira a /dev/null: si la copia es vieja y no tiene la
         # bandera --archivos, argparse escribe el motivo en stderr, y sin el
         # esto solo diria "no devolvio nada". Un 2>/dev/null tapando un fallo
         # real ya ha costado horas en este repo.
-        SEL_ERR="$DOTS/.select_design.err.$$"
-        LISTA="$(python3 "$DOTS/select_design.py" --archivos 2>"$SEL_ERR")"
+        SEL_ERR="${TMPDIR:-/tmp}/.select_design.err.$$"
+        LISTA="$(python3 "$SEL" --archivos 2>"$SEL_ERR")"
         SEL_RC=$?
         if [ "$SEL_RC" -ne 0 ] || [ -z "$LISTA" ]; then
             err "select_design.py --archivos fallo (rc=$SEL_RC)"
@@ -478,7 +482,7 @@ else
                 err "$N_FALLO de $((N_OK + N_FALLO)) archivo(s) no se pudieron recoger"
                 err "quickshell/ del repo NO se toca: se conserva lo que ya habia"
                 err "Si acabas de reinstalar end-4, repon los widgets con:"
-                err "  python3 $DOTS/select_design.py --widgets"
+                err "  python3 $SEL --widgets"
                 AVISOS+=("quickshell/ NO se actualizo: faltaban $N_FALLO archivo(s)")
             else
                 rm -rf "${DEST_QS:?}"
@@ -744,7 +748,6 @@ Configuración de escritorio para **CachyOS + Hyprland + end-4 (illogical-impuls
 | `hypr/` | `custom/*.lua` — mis overrides de Hyprland. Lo de end-4 no está aquí |
 | `illogical-impulse/` | `config.json` del shell |
 | `quickshell/` | Archivos **enteros** de la shell: 4 que pisan a end-4 y 10 widgets propios. `MANIFEST` (sha256) + `VERSION` (commit de end-4) |
-| `select_design.py` | Cambia la disposición de la barra y enciende/apaga los widgets. Es quien escribe `BarContent.qml` |
 | `alacritty/` | Terminal |
 | `bin/` | Scripts propios (`recorder`: grabación de pantalla) |
 | `spicetify/` | Tema de Spotify |
