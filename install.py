@@ -10,7 +10,7 @@ Que hace:
   2. Instala los archivos de /etc y /usr/share (con sudo)
   3. Copia el wallpaper
   4. Genera ~/.config/hypr/monitors.lua a partir de tus pantallas reales
-  5. Te guia por los parches de end-4 SIN aplicarlos a ciegas
+  5. Copia los archivos de la shell ENTEROS, comparando sha256 antes
   6. Comprueba el plugin del overview y su ruta
 
 Todo lo que sobrescribe o borra, lo respalda antes con marca de tiempo.
@@ -24,6 +24,8 @@ Uso:
 """
 
 import argparse
+import difflib
+import hashlib
 import json
 import os
 import shutil
@@ -39,31 +41,32 @@ SELLO = time.strftime("%Y%m%d-%H%M%S")
 # --si: unica forma de que un paso destructivo siga adelante sin terminal.
 AUTO_SI = False
 
-# Paquetes de stow. quickshell/ NO va aqui: sus archivos sobrescriben los de
-# end-4 y se tratan aparte, con diff de por medio.
+# Paquetes de stow. quickshell/ NO va aqui: no son enlaces sino copias que
+# pisan archivos de end-4, y se tratan aparte en despliega_shell().
 STOW = ["hypr", "illogical-impulse", "alacritty", "bin",
         "spicetify", "fish", "fastfetch", "starship"]
 
-# (archivo .patch, destino relativo a ~/.config/quickshell/ii, firma, descripcion)
+# Los archivos de la shell ya NO son diffs: el repo guarda copias ENTERAS en
+# quickshell/, y la lista vive en quickshell/MANIFEST, que escribe
+# dotfiles-setup.sh. No se hardcodea aqui: anadir un widget no deberia obligar
+# a editar dos scripts.
 #
-# Se guardan DIFFS, no copias enteras. Con una copia entera, cuando end-4
-# actualiza el archivo hay que elegir entre su version o la tuya. Con un diff,
-# 'patch' mete tu cambio SOBRE la version nueva y te quedas con las dos cosas;
-# y si el contexto cambio demasiado, falla diciendo que linea no cuadra.
+# Formato de MANIFEST, una linea por archivo, separado por tabuladores:
 #
-# La FIRMA es un fragmento que solo existe ya parcheado: sirve para saber si
-# hay que aplicar sin depender de que 'patch' adivine.
-PARCHES = [
-    ("BarContent.patch", "modules/ii/bar/BarContent.qml",
-     "rightCenterGroupContent.implicitWidth",
-     "disposicion de la barra: recursos izq, workspaces centro, reloj der"),
-    ("StyledPopup.patch", "modules/ii/bar/StyledPopup.qml",
-     "Math.max(0, Math.min",
-     "bug de end-4: popups recortados cerca de un borde"),
-    ("Background.patch", "modules/ii/background/Background.qml",
-     "WlrLayer.Background",
-     "bug de scrolloverview: WlrLayer.Bottom -> Background"),
-]
+#     <tipo>\t<sha256>\t<ruta relativa a ~/.config/quickshell/ii>
+#
+#   reemplazo — el archivo EXISTE en end-4 y lo pisamos. Perder su version es
+#               un riesgo real, asi que nunca se sobrescribe a ciegas.
+#   nuevo     — no existe en end-4; es aportacion nuestra. Copiarlo no puede
+#               destruir nada de upstream.
+#
+# Por que se abandonaron los diffs (v14 -> v15): un diff sobrevive a las
+# actualizaciones de end-4 mientras el contexto aguante, pero hay que
+# regenerarlo a mano cuando deja de aplicar. Con copias enteras el despliegue
+# es determinista. El precio es que un reemplazo PISA EN SILENCIO los cambios
+# de upstream — de ahi la comparacion de sha256 de mas abajo, que convierte
+# ese silencio en una pregunta.
+MANIFIESTO_SEP = "\t"
 
 SISTEMA = [
     ("system/nvidia/50-limit-free-buffer-pool-in-wayland-compositors.json",
@@ -452,95 +455,203 @@ def configura_monitores():
     return True
 
 
-# --------------------------------------------------------------- parches ----
-def revisa_parches():
-    say("Parches de end-4")
+# ------------------------------------------------------- shell (end-4) ----
+def sha256(p: Path):
+    try:
+        h = hashlib.sha256()
+        with open(p, "rb") as f:
+            for bloque in iter(lambda: f.read(65536), b""):
+                h.update(bloque)
+        return h.hexdigest()
+    except OSError:
+        return None
+
+
+def lee_manifiesto(ruta: Path):
+    """[(tipo, sha, ruta_relativa)] a partir de quickshell/MANIFEST."""
+    entradas, malas = [], 0
+    for linea in ruta.read_text(encoding="utf-8", errors="replace").split("\n"):
+        linea = linea.rstrip("\n")
+        if not linea.strip() or linea.lstrip().startswith("#"):
+            continue
+        partes = linea.split(MANIFIESTO_SEP)
+        if len(partes) != 3 or not partes[2].strip():
+            malas += 1
+            continue
+        tipo, sha, rel = (p.strip() for p in partes)
+        if tipo not in ("reemplazo", "nuevo"):
+            malas += 1
+            continue
+        entradas.append((tipo, sha, rel))
+    return entradas, malas
+
+
+def muestra_diff(a: Path, b: Path, lineas=14):
+    """Diff corto entre lo instalado y lo del repo. Sin depender de 'diff'."""
+    try:
+        va = a.read_text(encoding="utf-8", errors="replace").splitlines()
+        vb = b.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError as e:
+        warn("no pude leer para comparar: %s" % e)
+        return
+    d = list(difflib.unified_diff(va, vb, "instalado", "del repo",
+                                  lineterm="", n=1))
+    if not d:
+        return
+    for l in d[:lineas]:
+        print("        %s" % l)
+    if len(d) > lineas:
+        print("        ... %d lineas mas de diferencia" % (len(d) - lineas))
+
+
+def despliega_shell():
+    say("Archivos de la shell (end-4)")
 
     base = HOME / ".config/quickshell/ii"
     if not base.is_dir():
         warn("no existe %s — instala end-4 antes" % base)
         print("        bash <(curl -s https://ii.clsty.link/get)")
         return
-    if not shutil.which("patch"):
-        err("falta el comando 'patch':  sudo pacman -S patch")
+
+    origen = AQUI / "quickshell"
+    manifiesto = origen / "MANIFEST"
+    if not manifiesto.is_file():
+        warn("no hay quickshell/MANIFEST en el repo")
+        print("        lo genera dotfiles-setup.sh en la maquina de origen")
         return
 
-    dir_parches = AQUI / "patches"
-    if not dir_parches.is_dir():
-        warn("no hay carpeta patches/ en el repo")
+    # VERSION solo informa: contra que end-4 se recogio todo esto.
+    ver = origen / "VERSION"
+    if ver.is_file():
+        datos = dict()
+        for l in ver.read_text(encoding="utf-8", errors="replace").split("\n"):
+            if "=" in l and not l.lstrip().startswith("#"):
+                k, _, v = l.partition("=")
+                datos[k.strip()] = v.strip()
+        if datos.get("commit", "desconocido") != "desconocido":
+            print("    Recogido contra end-4 %s (%s)"
+                  % (datos["commit"][:12], datos.get("fecha", "?")))
+        else:
+            print("    La version de end-4 no consta: se instalo con ./setup,")
+            print("    que no deja checkout git. Si algo no cuadra, es por ahi.")
+
+    entradas, malas = lee_manifiesto(manifiesto)
+    if malas:
+        warn("%d linea(s) de MANIFEST ilegibles, omitidas" % malas)
+    if not entradas:
+        err("MANIFEST vacio o ilegible; no toco nada")
         return
 
-    print("    Son cambios SOBRE archivos de end-4. Se aplican con 'patch', asi")
-    print("    que sobreviven a sus actualizaciones mientras el contexto aguante.")
+    n_re = sum(1 for t, _, _ in entradas if t == "reemplazo")
+    print("    %d archivo(s): %d pisan a end-4, %d son nuestros."
+          % (len(entradas), n_re, len(entradas) - n_re))
+    print("    Se copian ENTEROS. Nunca se sobrescribe a ciegas: si lo que")
+    print("    tienes no coincide con el sha del repo, se ensena el diff.")
     print("")
 
-    for archivo, destino_rel, firma, desc in PARCHES:
-        parche = dir_parches / archivo
-        destino = base / destino_rel
+    ya = puestos = omitidos = fallos = 0
+    base_r, origen_r = base.resolve(), origen.resolve()
+    for tipo, sha_repo, rel in entradas:
+        src = origen / rel
+        dst = base / rel
 
-        print("    %s" % destino_rel)
-        print("      %s" % desc)
-
-        if not parche.is_file():
-            warn("falta %s en el repo" % archivo)
-            continue
-        if not destino.is_file():
-            warn("%s no existe en tu sistema" % destino_rel)
-            continue
-
+        # El MANIFEST es un archivo de texto del repo. Una ruta con '..' o
+        # absoluta haria que esto escribiera FUERA de la shell — y lo hacia,
+        # informando "escrito" y "0 con fallo". Comprobado. Las rutas que
+        # genera dotfiles-setup.sh nunca llevan '..', pero un manifiesto
+        # editado a mano o un fallo aguas arriba no deberian poder salirse.
         try:
-            actual = destino.read_text(encoding="utf-8", errors="replace")
+            dst.resolve().relative_to(base_r)
+            src.resolve().relative_to(origen_r)
+        except (ValueError, OSError):
+            err("%s: la ruta se sale de la shell; omitida" % rel)
+            fallos += 1
+            continue
+
+        if not src.is_file():
+            err("%s: falta en el repo" % rel)
+            fallos += 1
+            continue
+
+        # El sha del MANIFEST describe el archivo tal como se recogio. Si el
+        # del repo no cuadra, alguien lo edito sin regenerar el manifiesto.
+        sha_src = sha256(src)
+        if sha_src != sha_repo:
+            warn("%s: el sha del repo no cuadra con MANIFEST" % rel)
+            warn("  se usa el archivo, pero regenera el manifiesto")
+
+        if dst.is_file():
+            if sha256(dst) == sha_src:
+                ya += 1
+                continue
+            # Aqui esta el nudo de todo esto. Lo instalado difiere de lo
+            # nuestro, y con un reemplazo eso significa una de dos: o end-4
+            # actualizo el archivo, o lo editaste tu. Las dos merecen que
+            # pares a mirar, no un cp silencioso.
+            print("    %s  (%s)" % (rel, tipo))
+            if tipo == "reemplazo":
+                err("lo instalado NO es lo del repo")
+                print("        end-4 lo actualizo, o lo editaste tu. Si lo pisas,")
+                print("        pierdes ese cambio y no queda rastro.")
+            else:
+                warn("existe y es distinto (version anterior nuestra, o editado)")
+            muestra_diff(dst, src)
+            if not pregunta("      Sobrescribirlo?", False, destructivo=True):
+                warn("omitido")
+                omitidos += 1
+                continue
+        else:
+            if tipo == "reemplazo":
+                # Un 'reemplazo' que no existe en destino es raro: significa
+                # que end-4 borro o movio el archivo.
+                warn("%s: no existe en tu sistema (¿end-4 lo movio?)" % rel)
+                if not pregunta("      Crearlo igualmente?", False):
+                    omitidos += 1
+                    continue
+
+        copia = None
+        if dst.is_file():
+            copia = respalda(dst)
+            # respalda() devuelve None tanto si no habia archivo como si el
+            # respaldo FALLO. Aqui el archivo existe, asi que None solo puede
+            # ser un fallo — y sobrescribir sin red es justo lo que este
+            # mecanismo entero existe para evitar. Mejor saltarselo.
+            if copia is None:
+                err("%s: no pude respaldarlo, asi que NO lo sobrescribo" % rel)
+                omitidos += 1
+                continue
+        try:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
         except OSError as e:
-            warn("no pude leerlo: %s" % e)
-            continue
-
-        if firma in actual:
-            ok("ya aplicado (firma presente)")
-            continue
-
-        # --dry-run dice si aplicaria, sin tocar nada.
-        rc, salida, error = corre(
-            ["patch", "-p1", "--dry-run", "--input", str(parche)],
-            cwd=str(base))
-
-        if rc != 0:
-            err("el parche YA NO aplica limpiamente")
-            for l in (salida or error).split("\n")[:6]:
-                if l.strip():
-                    print("        %s" % l)
-            print("        end-4 cambio esa zona del archivo. Hay que rehacerlo:")
-            print("        1. mira el parche:  cat %s" % parche)
-            print("        2. aplica el cambio a mano en %s" % destino)
-            print("        3. regenera el diff (ver MANTENIMIENTO.md)")
-            continue
-
-        ok("aplicaria limpiamente")
-        if not pregunta("      Aplicarlo?", True, destructivo=True):
-            warn("omitido")
-            continue
-
-        copia = respalda(destino)
-        rc, salida, error = corre(
-            ["patch", "-p1", "--input", str(parche)], cwd=str(base))
-        if rc != 0:
-            err("fallo al aplicar: %s" % (error or salida))
+            err("%s: no pude copiarlo: %s" % (rel, e))
+            fallos += 1
             if copia:
                 try:
-                    shutil.copy2(copia, destino)
-                    warn("restaurado desde el respaldo")
+                    shutil.copy2(copia, dst)
+                    warn("  restaurado desde el respaldo")
                 except OSError:
-                    err("y no pude restaurar: %s" % copia)
+                    err("  y no pude restaurar: %s" % copia)
             continue
 
-        # No fiarse del rc: comprobar que la firma quedo de verdad.
-        try:
-            if firma in destino.read_text(encoding="utf-8", errors="replace"):
-                ok("aplicado y verificado (respaldo: %s)" %
-                   (copia.name if copia else "no habia version previa"))
-            else:
-                err("patch dijo que si pero la firma no esta; revisalo")
-        except OSError:
-            warn("aplicado, pero no pude releerlo para verificar")
+        # No fiarse del rc de copy2: releer y comparar.
+        if sha256(dst) == sha_src:
+            ok("%s escrito%s" % (rel, " (respaldo: %s)" % copia.name if copia else ""))
+            puestos += 1
+        else:
+            err("%s: se copio pero el sha no cuadra; revisalo" % rel)
+            fallos += 1
+
+    print("")
+    ok("%d al dia, %d escritos, %d omitidos, %d con fallo"
+       % (ya, puestos, omitidos, fallos))
+    if omitidos:
+        print("        Los omitidos siguen como estaban. Vuelve a pasar")
+        print("        install.py cuando decidas.")
+    if n_re:
+        print("        Tras cada actualizacion de end-4, revisa los %d marcados"
+              % n_re)
+        print("        'reemplazo': tu copia gana y no avisa por si sola.")
 
 
 # ---------------------------------------------------------------- plugin ----
@@ -889,10 +1000,23 @@ def main():
                     help="salta la configuracion de monitores")
     ap.add_argument("--sin-sistema", action="store_true",
                     help="no toca /etc ni /usr/share")
+    # Sin esto no habia forma de actualizar la shell en la MAQUINA ORIGEN sin
+    # pasar por stow, y stow la convierte en una maquina enlazada: a partir de
+    # ahi dotfiles-setup.sh aborta por su guarda y ya no hay de donde recoger.
+    # El manual mandaba justo ese comando tras actualizar end-4.
+    ap.add_argument("--solo-shell", action="store_true",
+                    help="solo despliega quickshell/ (para la maquina ORIGEN, "
+                         "que no debe pasar por stow)")
     ap.add_argument("--si", action="store_true",
                     help="responde que si; necesario sin terminal")
     args = ap.parse_args()
     AUTO_SI = args.si
+
+    if args.solo_shell:
+        # Nada de stow, nada de /etc, nada de wallpaper: solo los 14 archivos.
+        # Es lo que hay que correr en la maquina origen tras actualizar end-4.
+        despliega_shell()
+        return
 
     if args.solo_monitores:
         configura_monitores()
@@ -940,7 +1064,7 @@ def main():
     paso_wallpaper()
     if not args.sin_monitores:
         configura_monitores()
-    revisa_parches()
+    despliega_shell()
     revisa_plugin()
 
     say("Hecho")
