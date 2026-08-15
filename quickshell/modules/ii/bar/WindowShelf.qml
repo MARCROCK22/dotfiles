@@ -219,13 +219,14 @@ MouseArea {
     }
 
     // ================================================================ ACCIONES
-    // R12 / hecho verificado: con config Lua la sintaxis de dispatchers CAMBIA.
-    // `Hyprland.usingLua` (Quickshell 0.3.0) lo dice en tiempo de ejecución, así
-    // que no hay que adivinar: emitimos el dialecto correcto en cada caso.
+    // Con config Lua la sintaxis de dispatchers CAMBIA: `hyprctl dispatch X` se
+    // evalúa como `return hl.dispatch(X)` y la legacy es un error de sintaxis Lua,
+    // así que el dispatch no hace nada. `Hyprland.usingLua` NO EXISTE en
+    // Quickshell 0.3.0: valía undefined, la rama legacy se tomaba siempre y el
+    // estante no movía ni enfocaba nada (dejaba «Unable to assign [undefined] to
+    // bool» en el log). end-4 emite Lua sin condicionar — Workspaces.qml,
+    // OverviewWidget.qml, Lock.qml, TaskViewContent.qml — y aquí se hace igual.
     // Con Lua, `follow = false` es el equivalente exacto de `movetoworkspacesilent`.
-    // Se lee en el momento de despachar, no se cachea: `usingLua` es false hasta
-    // que el módulo Hyprland de Quickshell termina de inicializarse.
-    readonly property bool lua: Hyprland.usingLua
 
     // En Lua, un selector de workspace NUMÉRICO no puede ir entrecomillado y uno
     // con NOMBRE ("special:shelf", "r+1") sí. Mezclarlo es el fallo silencioso
@@ -246,19 +247,13 @@ MouseArea {
 
     function moveWindow(ws, addr, follow) {
         var sel = root.windowSelector(addr);
-        if (root.lua)
-            Hyprland.dispatch(`hl.dsp.window.move({ workspace = ${root.luaValue(ws)}, window = "${sel}", follow = ${follow ? "true" : "false"} })`);
-        else
-            Hyprland.dispatch(`${follow ? "movetoworkspace" : "movetoworkspacesilent"} ${ws},${sel}`);
+        Hyprland.dispatch(`hl.dsp.window.move({ workspace = ${root.luaValue(ws)}, window = "${sel}", follow = ${follow ? "true" : "false"} })`);
         root.nudgeWindowList();
     }
 
     function focusWindow(addr) {
         var sel = root.windowSelector(addr);
-        if (root.lua)
-            Hyprland.dispatch(`hl.dsp.focus({window = "${sel}"})`);
-        else
-            Hyprland.dispatch(`focuswindow ${sel}`);
+        Hyprland.dispatch(`hl.dsp.focus({window = "${sel}"})`);
     }
 
     // Refresco inmediato tras una acción DEL USUARIO (nunca en bucle). Lanza solo

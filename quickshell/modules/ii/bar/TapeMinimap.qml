@@ -324,28 +324,26 @@ Loader {
     // Acciones
     // ─────────────────────────────────────────────────────────────────────
 
-    // Hyprland 0.55 con config Lua: `hyprctl dispatch X` se evalúa como
-    // `return hl.dispatch(X)`, así que la sintaxis legacy es un error de sintaxis
-    // Lua. Quickshell expone `Hyprland.usingLua` justo para esto. La rama Lua es
-    // la que ya usa end-4 en OverviewWidget.qml.
+    // Con config Lua, `hyprctl dispatch X` se evalúa como `return hl.dispatch(X)`,
+    // así que la sintaxis legacy es un error de sintaxis Lua y el dispatch no
+    // hace nada. `Hyprland.usingLua` NO EXISTE en Quickshell 0.3.0: valía
+    // undefined, la rama legacy se tomaba siempre y esto fallaba en silencio
+    // (comprobado en Hyprland 0.56.2: `focuswindow address:0x…` devuelve
+    // «')' expected near 'address'»). end-4 emite el dialecto Lua sin
+    // condicionar — Workspaces.qml, OverviewWidget.qml, Lock.qml,
+    // TaskViewContent.qml — y aquí se hace igual.
     function focusAddress(addr) {
         // La dirección se interpola dentro de una cadena Lua. Sólo dejamos pasar
         // hex canónico: así no hace falta escapar comillas ni barras y una
         // dirección corrupta no puede generar Lua roto.
         if (!addr || !/^0x[0-9a-fA-F]+$/.test(String(addr)))
             return;
-        if (Hyprland.usingLua)
-            Hyprland.dispatch(`hl.dsp.focus({window = "address:${addr}"})`);
-        else
-            Hyprland.dispatch(`focuswindow address:${addr}`);
+        Hyprland.dispatch(`hl.dsp.focus({window = "address:${addr}"})`);
     }
 
     function stepFocus(dir) {
         const d = dir < 0 ? "left" : "right";
-        if (Hyprland.usingLua)
-            Hyprland.dispatch(`hl.dsp.focus({direction = "${d}"})`);
-        else
-            Hyprland.dispatch(`movefocus ${d === "left" ? "l" : "r"}`);
+        Hyprland.dispatch(`hl.dsp.focus({direction = "${d}"})`);
     }
 
     // ─────────────────────────────────────────────────────────────────────
