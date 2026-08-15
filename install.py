@@ -78,6 +78,9 @@ SISTEMA = [
     ("system/libinput/local-overrides.quirks",
      "/etc/libinput/local-overrides.quirks",
      "quirks de libinput (touchpad — inutil en escritorio)"),
+    ("system/geolocation",
+     "/etc/geolocation",
+     "ubicacion fija de GeoClue (sin esto, el clima cae a IP con 25 km)"),
 ]
 
 

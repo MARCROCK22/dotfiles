@@ -1,0 +1,21 @@
+# Ubicacion fija para GeoClue.  Formato: cuatro numeros, uno por linea:
+#   latitud, longitud, altitud en metros, radio de precision en metros.
+# GeoClue vigila este archivo: al editarlo se aplica en caliente.
+#
+# POR QUE EXISTE: ninguna base de datos de geolocalizacion por WiFi (BeaconDB,
+# Positon) tiene cobertura de Santo Domingo, asi que GeoClue caia a IP con un
+# radio de 25 km.  Comprobado consultando ambas APIs: devuelven "fallback: ipf".
+#
+# EL RADIO ES 5000 A PROPOSITO, no 15.  Dos razones:
+#   1. Es honesto: esto es un punto escrito a mano, no una medicion.
+#   2. GeoClue desempata por radio.  Con 5000 sigue ganando a la IP (25000),
+#      pero si algun dia hay cobertura WiFi de verdad (20-100 m), esa GANA sola
+#      y vuelve la geolocalizacion real.  Con 15 quedaria congelado para siempre.
+#
+# Es el centro de la ciudad, NO un domicilio: este archivo va a un repo publico.
+# Para que la etiqueta del clima diga tu sector, ajusta las dos primeras lineas
+# en la copia local -- pero piensa antes de commitear coordenadas de tu casa.
+18.4861
+-69.9312
+20
+5000
