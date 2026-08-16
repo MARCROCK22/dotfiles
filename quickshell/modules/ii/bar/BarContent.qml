@@ -106,6 +106,15 @@ Item { // Bar content region
                 // esquina redondeada de la pantalla. Mismo valor que usa
                 // RippleButton en el extremo contrario, así queda simétrico.
                 Layout.leftMargin: leftSidebarButton.visible ? 0 : Appearance.rounding.screenRounding
+                // Tope estructural, no un número inventado: esta isla no puede
+                // ser más ancha que la sección izquierda entera, que ya está
+                // anclada a `middleSection.left`.  Sin esto, un título de
+                // canción largo la hacía crecer sin freno y cruzaba la barra
+                // por debajo de workspaces, clima y reloj (comprobado con uno
+                // de 130 caracteres).  Media tiene `fillWidth` y `elide`, así
+                // que al toparse es su texto el que se recorta, no los anillos.
+                Layout.minimumWidth: 0
+                Layout.maximumWidth: barLeftSideMouseArea.width
 
                 StatsIsland {
                     Layout.fillWidth: root.useShortenedForm === 2
@@ -118,10 +127,18 @@ Item { // Bar content region
             }
 
             // ── isla del título de la ventana enfocada ──────────────────
-            // Sin `fillWidth`: con él la isla se estiraría hasta la central y
-            // quedaría una píldora enorme medio vacía. El tope de ancho hace
-            // que un título largo elide (los textos de dentro ya traen
-            // `elide: ElideRight`) en vez de invadir el centro.
+            // El tope tiene que salir del CONTENIDO, no ser un número fijo.
+            // Con `maximumWidth: 460` a pelo la isla no sabía cuánto hueco
+            // quedaba hasta la isla central y se le metía encima (medido: con
+            // un título de 96 caracteres la franja iba de x=424 a x=1146 sin
+            // separación, y la central lo tapaba por ir declarada después).
+            //
+            // `fillWidth: true` + máximo atado al ancho natural del contenido
+            // da exactamente lo que se quiere: ancho = min(hueco, contenido).
+            // Título corto -> se ciñe al texto, sin píldora medio vacía.
+            // Título largo -> lo limita el hueco y el texto se DESLIZA dentro
+            // (TituloDeslizante recorta y anima), en vez de cortarse.
+            // `minimumWidth: 0` es lo que le permite encoger de verdad.
             IslandGroup {
                 outlined: true
                 tint: root.islaTinte
@@ -130,11 +147,13 @@ Item { // Bar content region
                 padding: root.islaPadding
                 Layout.alignment: Qt.AlignVCenter
                 Layout.leftMargin: 10
-                Layout.fillWidth: false
-                Layout.maximumWidth: 460
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                Layout.maximumWidth: ventanaActiva.implicitWidth + root.islaPadding * 2
                 visible: root.useShortenedForm === 0
 
-                ActiveWindow {
+                TituloDeslizante {
+                    id: ventanaActiva
                     Layout.fillWidth: true
                 }
             }
