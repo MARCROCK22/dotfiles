@@ -259,7 +259,6 @@ Item { // Bar content region
                 padding: root.islaPadding
                 Layout.alignment: Qt.AlignVCenter
                 Layout.rightMargin: Appearance.rounding.screenRounding
-
                 RippleButton { // Right sidebar button
                     id: rightSidebarButton
 
@@ -324,6 +323,12 @@ Item { // Bar content region
                             Layout.fillHeight: true
                             implicitHeight: reveal ? notificationUnreadCount.implicitHeight : 0
                             implicitWidth: reveal ? notificationUnreadCount.implicitWidth : 0
+                            // Cada revelador aporta SU propia separación por la
+                            // derecha. Este la había perdido en una edición mía y
+                            // se quedó un `Behavior` sobre una propiedad que ya
+                            // no se asignaba: código muerto, y sin hueco cuando
+                            // el aviso aparece.
+                            Layout.rightMargin: reveal ? indicatorsRowLayout.realSpacing : 0
                             Behavior on Layout.rightMargin {
                                 animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
                             }
@@ -335,7 +340,14 @@ Item { // Bar content region
                         // isla de la derecha con su propio detalle al hover, y
                         // tenerlo dos veces sería ruido.
                         MaterialSymbol {
-                            Layout.leftMargin: indicatorsRowLayout.realSpacing
+                            // SIN margen izquierdo. En end-4 lo llevaba para
+                            // separarse del icono de red que iba justo antes;
+                            // al mover la red a la isla derecha, el bluetooth
+                            // quedó el primero y esos 15 px pasaron a ser hueco
+                            // por delante. Como la fila va centrada en el botón,
+                            // el icono salía descuadrado a la derecha.
+                            // La separación, cuando hace falta, la ponen los
+                            // reveladores con su `rightMargin`.
                             visible: BluetoothStatus.available
                             text: BluetoothStatus.connected ? "bluetooth_connected" : BluetoothStatus.enabled ? "bluetooth" : "bluetooth_disabled"
                             iconSize: Appearance.font.pixelSize.larger
