@@ -357,12 +357,23 @@ ARCHIVOS_SHELL=(
     "nuevo	modules/ii/bar/AlertLine.qml"
     "nuevo	modules/ii/bar/GpuWidget.qml"
     "nuevo	modules/ii/bar/IslandGroup.qml"
+    "nuevo	modules/ii/bar/KeyboardLayoutButton.qml"
+    "nuevo	modules/ii/bar/MediaIsland.qml"
+    "nuevo	modules/ii/bar/MediaPopup.qml"
+    "nuevo	modules/ii/bar/NetworkIsland.qml"
+    "nuevo	modules/ii/bar/NetworkPopup.qml"
     "nuevo	modules/ii/bar/OgeeBackground.qml"
+    "nuevo	modules/ii/bar/PopupState.qml"
+    "nuevo	modules/ii/bar/PowerButton.qml"
     "nuevo	modules/ii/bar/Pulse.qml"
     "nuevo	modules/ii/bar/QuickControls.qml"
     "nuevo	modules/ii/bar/SpaceNav.qml"
+    "nuevo	modules/ii/bar/StatsIsland.qml"
+    "nuevo	modules/ii/bar/StatsPopup.qml"
+    "nuevo	modules/ii/bar/StatsProbe.qml"
     "nuevo	modules/ii/bar/SysReadouts.qml"
     "nuevo	modules/ii/bar/TapeMinimap.qml"
+    "nuevo	modules/ii/bar/TituloDeslizante.qml"
     "nuevo	modules/ii/bar/WindowShelf.qml"
 )
 
@@ -386,12 +397,28 @@ else
         if [ -z "$LISTA_SEL" ]; then
             warn "$(basename "$SEL") no sabe responder --archivos (copia vieja)"
             warn "  da igual: la lista de este script es la que manda"
-        elif [ "$LISTA_SEL" = "$(printf '%s\n' "${ARCHIVOS_SHELL[@]}" | sort)" ]; then
-            ok "la lista cuadra con la de $(basename "$SEL")"
         else
-            warn "la lista de este script y la de $SEL NO coinciden"
-            warn "  ¿has anadido un widget y no lo has puesto en ARCHIVOS_SHELL?"
-            AVISOS+=("las dos listas de archivos de la shell han divergido")
+            # Relacion correcta: ARCHIVOS_SHELL debe ser SUPERCONJUNTO de la de
+            # select_design.py.  No pueden ser iguales: aqui van ademas
+            # StyledPopup y Background, que select_design.py no conoce.  La
+            # version anterior comparaba por igualdad, asi que avisaba SIEMPRE y
+            # el aviso se volvio ruido de fondo.
+            #
+            # Y aborta en vez de avisar, porque la consecuencia no es cosmetica:
+            # lo que falte aqui se BORRA del repo en el 'rm -rf' de mas abajo.
+            # Paso de verdad el 2026-08-16: 11 componentes desaparecieron del
+            # repo publico en un commit de "Actualizar configuracion".
+            NO_LISTADOS="$(comm -23 <(printf '%s\n' "$LISTA_SEL") \
+                                    <(printf '%s\n' "${ARCHIVOS_SHELL[@]}" | sort))"
+            if [ -z "$NO_LISTADOS" ]; then
+                ok "ARCHIVOS_SHELL cubre todo lo de $(basename "$SEL")"
+            else
+                err "hay archivos en $(basename "$SEL") que NO estan en ARCHIVOS_SHELL:"
+                printf '%s\n' "$NO_LISTADOS" | sed 's/^/        /'
+                err "  si se recoge asi, esos archivos se BORRAN del repo"
+                err "  anadelos a ARCHIVOS_SHELL en este script y vuelve a lanzarlo"
+                FALTANTES+=("archivos de la shell sin listar en ARCHIVOS_SHELL")
+            fi
         fi
     fi
 
@@ -959,7 +986,7 @@ else
     else
         warn "git no tiene identidad configurada; se usa una por defecto"
         warn "para cambiarla:  git config --global user.email tu@correo"
-        git -c user.email="${GIT_AUTHOR_EMAIL:-emilio@clip.tech}" \
+        git -c user.email="${GIT_AUTHOR_EMAIL:-57925328+MARCROCK22@users.noreply.github.com}" \
             -c user.name="${GIT_AUTHOR_NAME:-${USER:-marcrock}}" \
             commit -q -m "$MENSAJE"
     fi
