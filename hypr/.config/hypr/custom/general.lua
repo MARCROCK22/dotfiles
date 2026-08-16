@@ -48,17 +48,11 @@ hl.animation({
   style = "slidevert"
 })
 
--- Segunda distribución de teclado --------------------------------------------
--- Va AQUÍ y no en hyprland/general.lua: ese archivo es de end-4, no está
--- versionado en el repo y `./setup` lo pisa al actualizar. `custom/general.lua`
--- se carga después (hyprland.lua:26 frente a :16), así que este valor gana.
---
--- Con dos distribuciones aparece el botón de teclado de la barra
--- (KeyboardLayoutButton), que está oculto mientras solo haya una: rota con
--- `hyprctl switchxkblayout all next`, que es un COMANDO de hyprctl y por eso
--- mantiene la sintaxis clásica aunque la config sea Lua.
-hl.config({
-  input = {
-    kb_layout = "us,es",
-  },
-})
+-- Segunda distribución de teclado: RETIRADA el 2026-08-16 --------------------
+-- Estuvo aquí como `kb_layout = "us,es"` para que apareciera el
+-- KeyboardLayoutButton de la barra. Provocó un bloqueo: el greeter de SDDM usa
+-- siempre `us` (/etc/vconsole.conf), así que con `es` activo la contraseña
+-- entraba en el login y la rechazaban la pantalla de bloqueo y sudo, que sí
+-- corren dentro de la sesión. Y sin `kb_options` de grupo, el botón de la barra
+-- era la ÚNICA forma de volver a `us`, inalcanzable desde el lock.
+-- Si se reintroduce: añadir también un atajo de teclado para rotar.
