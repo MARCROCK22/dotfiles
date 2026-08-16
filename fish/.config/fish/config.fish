@@ -33,3 +33,6 @@ if status is-interactive
 end
 export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOME/.local/bin:$PATH"
+
+# opencode
+fish_add_path /home/marcrock/.opencode/bin
