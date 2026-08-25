@@ -10,6 +10,51 @@ hl.unbind("SUPER + SHIFT + Right")
 hl.bind("SUPER + SHIFT + Left",  hl.dsp.layout("swapcol l"))
 hl.bind("SUPER + SHIFT + Right", hl.dsp.layout("swapcol r"))
 
+-- mover-entre-monitores ------------------------------------------------------
+-- SUPER+ALT+←/→ manda la ventana a la pantalla de al lado. SUPER+SHIFT+←/→ se
+-- queda con `swapcol`, que reordena columnas dentro del workspace.
+--
+-- NO se usa `window.move({direction})`, que sería lo obvio: ése sólo cruza de
+-- monitor si la ventana YA está en la columna del borde de ese lado. Medido:
+-- hacia la derecha funcionaba —una ventana recién colocada suele estar al final
+-- de la cinta— pero hacia la izquierda se limitaba a intercambiarse con la
+-- columna vecina y se quedaba en la misma pantalla.
+--
+-- En su lugar se manda al WORKSPACE ACTIVO del monitor contiguo, que no depende
+-- de dónde esté la ventana dentro de la cinta. Con follow=false el foco no
+-- viaja solo, así que se re-enfoca a mano por dirección.
+local function mover_a_monitor(dir)
+    local m = hl.get_active_monitor()
+    local w = hl.get_active_window()
+    if not m or not w then return end
+
+    local destino = nil
+    for _, o in ipairs(hl.get_monitors() or {}) do
+        if o.name ~= m.name then
+            local al_lado
+            if dir == "l" then al_lado = o.x < m.x else al_lado = o.x > m.x end
+            -- el más cercano en esa dirección, por si algún día hay tres
+            if al_lado and (destino == nil or math.abs(o.x - m.x) < math.abs(destino.x - m.x)) then
+                destino = o
+            end
+        end
+    end
+    if destino == nil then return end          -- no hay pantalla en esa dirección
+
+    local ws = destino.active_workspace and destino.active_workspace.id
+    if ws == nil then return end
+
+    local addr = w.address
+    hl.dispatch(hl.dsp.window.move({ workspace = tostring(ws), follow = false }))
+    hl.dispatch(hl.dsp.focus({ window = "address:" .. addr }))
+end
+
+hl.bind("SUPER + ALT + Left",  function() mover_a_monitor("l") end,
+    { description = "Window: Move to monitor left" })
+hl.bind("SUPER + ALT + Right", function() mover_a_monitor("r") end,
+    { description = "Window: Move to monitor right" })
+-- fin -- mover-entre-monitores ------------------------------------------------
+
 hl.unbind("SUPER + BracketLeft")
 hl.unbind("SUPER + BracketRight")
 
