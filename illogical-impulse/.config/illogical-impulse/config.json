@@ -80,7 +80,7 @@
             "workspaceZoom": 1.07
         },
         "thumbnailPath": "",
-        "wallpaperPath": "/home/marcrock/Descargas/rain_world.png",
+        "wallpaperPath": "/home/marcrock/Imágenes/wallpapers/rain_world.png",
         "widgets": {
             "clock": {
                 "cookie": {
@@ -363,7 +363,7 @@
             "enable": false
         },
         "night": {
-            "automatic": true,
+            "automatic": false,
             "colorTemperature": 5000,
             "from": "19:00",
             "to": "06:30"
