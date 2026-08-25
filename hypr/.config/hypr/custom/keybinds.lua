@@ -47,6 +47,34 @@ local function mover_a_monitor(dir)
     local addr = w.address
     hl.dispatch(hl.dsp.window.move({ workspace = tostring(ws), follow = false }))
     hl.dispatch(hl.dsp.focus({ window = "address:" .. addr }))
+
+    -- Hyprland la añade SIEMPRE al final (derecha) de la cinta de destino,
+    -- venga del lado que venga. Yendo a la izquierda eso ya es correcto —entra
+    -- por su borde derecho, el contiguo—, pero yendo a la derecha aparecía en
+    -- el extremo opuesto al que venía.
+    --
+    -- Se camina hacia el frente con `swapcol l`, un paso por vuelta, hasta que
+    -- deja de haber ninguna columna a su izquierda. NO se hace con un solo
+    -- `swapcol r`: ése ENVUELVE, o sea intercambia la última con la primera, y
+    -- mandaba la que estaba primera al extremo contrario. Tampoco se cuentan
+    -- los pasos por adelantado: la cuenta no cuadraba con el envolvimiento.
+    -- El tope de vueltas evita quedarse colgado si algo no converge.
+    if dir == "r" then
+        for _ = 1, 12 do
+            local mia, minx = nil, nil
+            for _, o in ipairs(hl.get_windows() or {}) do
+                if o.mapped and not o.floating and o.monitor
+                   and o.monitor.name == destino.name
+                   and o.workspace and o.workspace.id == ws then
+                    local x = o.at.x
+                    if minx == nil or x < minx then minx = x end
+                    if o.address == addr then mia = x end
+                end
+            end
+            if mia == nil or minx == nil or mia <= minx then break end
+            hl.dispatch(hl.dsp.layout("swapcol l"))
+        end
+    end
 end
 
 hl.bind("SUPER + ALT + Left",  function() mover_a_monitor("l") end,
