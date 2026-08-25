@@ -191,6 +191,7 @@ reflector
 resvg
 s-nail
 sddm
+sddm-astronaut-theme
 sg3_utils
 shelly
 smartmontools
@@ -222,6 +223,7 @@ usb_modeswitch
 usbutils
 uwsm
 vim
+visual-studio-code-bin
 vlc-plugins-all
 vpl-gpu-rt
 vulkan-icd-loader
