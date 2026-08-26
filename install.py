@@ -44,7 +44,7 @@ AUTO_SI = False
 # Paquetes de stow. quickshell/ NO va aqui: no son enlaces sino copias que
 # pisan archivos de end-4, y se tratan aparte en despliega_shell().
 STOW = ["hypr", "illogical-impulse", "alacritty", "bin",
-        "spicetify", "fish", "fastfetch", "starship"]
+        "fish", "fastfetch", "starship"]
 
 # Los archivos de la shell ya NO son diffs: el repo guarda copias ENTERAS en
 # quickshell/, y la lista vive en quickshell/MANIFEST, que escribe

@@ -13,7 +13,6 @@ Este repo contiene **solo lo que va encima de end-4**, no end-4 entero.
 | `patches/` | Diffs sobre archivos de end-4. Los aplica `install.py` con `patch` |
 | `alacritty/` | Terminal |
 | `bin/` | Scripts propios (`recorder`: grabación de pantalla) |
-| `spicetify/` | Tema de Spotify |
 | `fish/` | Shell |
 | `fastfetch/` | Resumen del sistema al abrir la terminal |
 | `starship/` | Prompt |

@@ -270,7 +270,7 @@ fi
 # ---------- estructura ----------
 say "Preparando estructura"
 mkdir -p "$DOTS"/{hypr/.config/hypr/custom,alacritty/.config/alacritty}
-mkdir -p "$DOTS"/{bin/.local/bin,spicetify/.config,illogical-impulse/.config/illogical-impulse}
+mkdir -p "$DOTS"/{bin/.local/bin,illogical-impulse/.config/illogical-impulse}
 mkdir -p "$DOTS"/{fish/.config/fish,fastfetch/.config/fastfetch,starship/.config}
 mkdir -p "$DOTS"/{system/nvidia,system/sddm,wallpaper}
 ok "directorios listos"
@@ -308,7 +308,6 @@ copiar_dir      "$HOME/.config/fish/conf.d"    "$DOTS/fish/.config/fish/conf.d" 
 # fish_variables se excluye a propósito: lo genera fish solo y cambia constantemente
 # VS Code se excluye a proposito: el repo es publico y sus ajustes pueden
 # arrastrar rutas, tokens de extensiones y configuracion de trabajo.
-copiar_dir "$HOME/.config/spicetify" "$DOTS/spicetify/.config/spicetify" "spicetify"
 copiar "$HOME/.config/fastfetch/config.jsonc"     "$DOTS/fastfetch/.config/fastfetch" "fastfetch"
 copiar "$HOME/.config/starship.toml"              "$DOTS/starship/.config"            "starship (prompt)"
 
@@ -788,7 +787,6 @@ Configuración de escritorio para **CachyOS + Hyprland + end-4 (illogical-impuls
 | `quickshell/` | Archivos **enteros** de la shell: 4 que pisan a end-4 y 10 widgets propios. `MANIFEST` (sha256) + `VERSION` (commit de end-4) |
 | `alacritty/` | Terminal |
 | `bin/` | Scripts propios (`recorder`: grabación de pantalla) |
-| `spicetify/` | Tema de Spotify |
 | `fish/` | Shell |
 | `fastfetch/` | Resumen del sistema al abrir la terminal |
 | `starship/` | Prompt |
@@ -884,8 +882,8 @@ RUIDO="$RUIDO|users without a password"
 
 # El propio script se excluye: su variable PATRON contiene justo las palabras
 # que busca, asi que se encontraba a si mismo en cada ejecucion.
-# --exclude=README.md excluia por nombre en TODO el arbol, incluidos los de
-# los temas de spicetify. Se filtra despues, solo el de la raiz.
+# --exclude=README.md excluia por nombre en TODO el arbol, incluidos los
+# anidados dentro de los paquetes. Se filtra despues, solo el de la raiz.
 RESULTADO=$(grep -rniE "$PATRON" "$DOTS" \
     --exclude-dir=.git --exclude=pkglist.txt \
     --exclude=dotfiles-setup.sh 2>/dev/null \
