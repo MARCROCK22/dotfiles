@@ -15,14 +15,12 @@ hl.bind("SUPER + SHIFT + Right", hl.dsp.layout("swapcol r"))
 -- queda con `swapcol`, que reordena columnas dentro del workspace.
 --
 -- NO se usa `window.move({direction})`, que sería lo obvio: ése sólo cruza de
--- monitor si la ventana YA está en la columna del borde de ese lado. Medido:
--- hacia la derecha funcionaba —una ventana recién colocada suele estar al final
--- de la cinta— pero hacia la izquierda se limitaba a intercambiarse con la
--- columna vecina y se quedaba en la misma pantalla.
+-- monitor si la ventana YA está en la columna del borde de ese lado. Desde
+-- cualquier otra posición se limita a moverla dentro de la cinta, y como esta
+-- tecla debe funcionar mirando donde mires, no sirve.
 --
 -- En su lugar se manda al WORKSPACE ACTIVO del monitor contiguo, que no depende
--- de dónde esté la ventana dentro de la cinta. Con follow=false el foco no
--- viaja solo, así que se re-enfoca a mano por dirección.
+-- de dónde esté la ventana. El foco viaja solo: `follow` vale true por defecto.
 local function mover_a_monitor(dir)
     local m = hl.get_active_monitor()
     local w = hl.get_active_window()
@@ -45,19 +43,18 @@ local function mover_a_monitor(dir)
     if ws == nil then return end
 
     local addr = w.address
-    hl.dispatch(hl.dsp.window.move({ workspace = tostring(ws), follow = false }))
-    hl.dispatch(hl.dsp.focus({ window = "address:" .. addr }))
+    hl.dispatch(hl.dsp.window.move({ workspace = tostring(ws) }))
 
     -- Hyprland la añade SIEMPRE al final (derecha) de la cinta de destino,
     -- venga del lado que venga. Yendo a la izquierda eso ya es correcto —entra
-    -- por su borde derecho, el contiguo—, pero yendo a la derecha aparecía en
-    -- el extremo opuesto al que venía.
+    -- por su borde derecho, el contiguo—, pero yendo a la derecha aparece en el
+    -- extremo opuesto al que venía.
     --
     -- Se camina hacia el frente con `swapcol l`, un paso por vuelta, hasta que
-    -- deja de haber ninguna columna a su izquierda. NO se hace con un solo
-    -- `swapcol r`: ése ENVUELVE, o sea intercambia la última con la primera, y
-    -- mandaba la que estaba primera al extremo contrario. Tampoco se cuentan
-    -- los pasos por adelantado: la cuenta no cuadraba con el envolvimiento.
+    -- deja de haber ninguna columna a su izquierda. No existe atajo de un solo
+    -- paso: `move <n>` desplaza la VISTA y no reordena, `promote` sólo saca la
+    -- ventana a una columna propia, y `swapcol r` sobre la última ENVUELVE
+    -- intercambiándola con la primera, que se iría al extremo contrario.
     -- El tope de vueltas evita quedarse colgado si algo no converge.
     if dir == "r" then
         for _ = 1, 12 do
