@@ -101,6 +101,7 @@ illogical-impulse-widgets
 inetutils
 iniparser
 iwd
+jdk-openjdk
 jfsutils
 lazygit
 less
