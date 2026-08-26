@@ -19,3 +19,14 @@ if izquierda then
     hl.workspace_rule({ workspace = "1", monitor = izquierda, default = true })
 end
 -- fin -- pantalla-principal --------------------------------------------------
+
+-- cinta-vertical --------------------------------------------------------------
+-- El layout de scroll admite `direction`, y acepta "down"/"up" además de
+-- "left"/"right". Como se puede fijar por workspace con `layout_opts`, caben
+-- unos workspaces horizontales y otros verticales en la misma sesión.
+--
+-- El 2 va en vertical a modo de prueba: las ventanas se apilan hacia abajo, y
+-- las mismas teclas siguen valiendo porque las flechas siguen la dirección de
+-- la cinta. Si no convence, se borra este bloque y no queda rastro.
+hl.workspace_rule({ workspace = "2", layout_opts = { direction = "down" } })
+-- fin -- cinta-vertical -------------------------------------------------------
