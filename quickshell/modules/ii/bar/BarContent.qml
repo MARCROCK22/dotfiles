@@ -138,10 +138,6 @@ Item { // Bar content region
             }
 
             // ── isla de espacios de trabajo ─────────────────────────────
-            // Salen como puntos sin tocar Workspaces.qml: con
-            // `alwaysShowNumbers` y `showAppIcons` apagados en config.json,
-            // NumberWorkspaceItem cae a su `Circle` de 5 px y del activo se
-            // encarga TrailingIndicator, que ya era la píldora alargada.
             IslandGroup {
                 outlined: root.islaContorno
                 tint: root.islaTinte

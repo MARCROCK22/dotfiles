@@ -277,11 +277,11 @@
             "workspace": "shelf"
         },
         "workspaces": {
-            "alwaysShowNumbers": false,
+            "alwaysShowNumbers": true,
             "monochromeIcons": true,
             "numberMap": [
             ],
-            "showAppIcons": false,
+            "showAppIcons": true,
             "showNumberDelay": 300,
             "shown": 10,
             "useNerdFont": false
