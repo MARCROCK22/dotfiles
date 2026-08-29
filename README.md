@@ -8,7 +8,7 @@ Este repo contiene **solo lo que va encima de end-4**, no end-4 entero.
 
 | Carpeta | Contenido |
 |---|---|
-| `hypr/` | `custom/*.lua` — mis overrides de Hyprland, y `hypridle.conf`. `monitors.lua` **no** está aquí: es de cada máquina |
+| `hypr/` | `custom/*.lua` — mis overrides de Hyprland, y `hypridle.conf`. **No** van aquí `monitors.lua` (es de cada máquina) ni `custom/scripts/__restore_video_wallpaper.sh` (lo genera `switchwall.sh`, y lo hace con un `mv` encima, que sustituye el enlace de stow en cada cambio de fondo) |
 | `illogical-impulse/` | `config.json` del shell (barra, dock, sidebars, temas) |
 | `patches/` | Diffs sobre archivos de end-4. Los aplica `install.py` con `patch` |
 | `alacritty/` | Terminal |
