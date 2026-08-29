@@ -18,18 +18,16 @@ import qs.modules.common.functions
  * Los tres valores salen de medir el diseño de referencia, no de estimarlos:
  * banda rgb(26,27,29), píldora rgb(40,40,40), y en el corte del borde de una
  * píldora se pasa del fondo al relleno en un solo píxel de suavizado — o sea,
- * no hay anillo de contorno. De ahí `colLayer0` para la banda, `colLayer1` para
- * la píldora y `islaContorno` en false.
+ * no hay anillo de contorno.
  *
  * La banda pide `bar.cornerStyle` a 0: con 1 se dibuja con los márgenes de
- * Hyprland y esquinas redondeadas, que es el rectángulo flotante con borde, y
+ * Hyprland y esquinas redondeadas, que es un rectángulo flotante con borde, y
  * la referencia llega hasta x=0 sin margen.
  *
- * Reparto:
- *   izquierda  hora con día, espacios de trabajo y ventana enfocada
- *   centro     vacío
- *   derecha    anillos, multimedia, clima, avisos, utilidades, teclado,
- *              red, batería y sesión
+ * Reparto pedido:
+ *   izquierda  RAM / GPU / swap en anillos + multimedia
+ *   centro     espacios de trabajo + clima
+ *   derecha    hora con día, utilidades, teclado, batería, red y sesión
  *
  * Todo lo que no sean los espacios de trabajo tiene detalle al pasar el ratón.
  * El de multimedia además se puede TOCAR: controles, búsqueda y
@@ -47,18 +45,14 @@ Item { // Bar content region
     readonly property int centerSideModuleWidth: (useShortenedForm == 2) ? Appearance.sizes.barCenterSideModuleWidthHellaShortened : (useShortenedForm == 1) ? Appearance.sizes.barCenterSideModuleWidthShortened : Appearance.sizes.barCenterSideModuleWidth
 
     // Ajustes comunes a todas las islas, en un solo sitio para que no deriven.
-    // Una capa por encima de la banda, que es colLayer0: con el mismo tono
-    // las píldoras se fundirían con ella y no se vería ningún grupo.
-    // `applyAlpha(..., 1)` porque `appearance.transparency` deja la paleta con
-    // alfa y la referencia es opaca: sin esto el fondo de pantalla se cuela y el
-    // color de la banda cambia a lo largo de la barra (medido: de rgb(22,29,41)
-    // sobre la zona azul a rgb(53,33,30) sobre la roja).
-    // colLayer1 a pelo se va a rgb(92,81,82) sobre una banda de rgb(22,21,22):
-    // +70 de salto, cuando la referencia solo sube +14 (banda 26,27,29 contra
-    // píldora 40,40,40). No es un capricho de colLayer1: su valor crudo está
-    // pensado para componerse con alfa (`solveOverlayColor`), así que opacarlo
-    // tal cual lo deja mucho más claro de lo que se ve normalmente.
+    // colLayer0 es el color de la BANDA: con él las píldoras se fundirían con
+    // ella. Y colLayer1 a pelo salta +70 en vez del +14 de la referencia,
+    // porque su valor crudo está pensado para componerse con alfa
+    // (`solveOverlayColor`) y opacarlo tal cual lo deja mucho más claro.
     // El 0.8 mezcla 80% banda + 20% colLayer1 y reproduce ese +14.
+    // `applyAlpha(...,1)` porque `appearance.transparency` deja la paleta con
+    // alfa, y sin eso el fondo de pantalla se cuela y tiñe la banda a lo largo
+    // de la barra (medido: rgb(22,29,41) sobre lo azul, rgb(53,33,30) sobre lo rojo).
     readonly property color islaTinte: ColorUtils.applyAlpha(ColorUtils.mix(Appearance.colors.colLayer0, Appearance.colors.colLayer1, 0.8), 1)
     readonly property bool islaContorno: false
     readonly property int islaRadio: Appearance.rounding.full
@@ -128,49 +122,44 @@ Item { // Bar content region
             anchors.fill: parent
             spacing: 0
 
-            // El reloj abre la fila, suelto y sin isla: es el ancla del
-            // extremo izquierdo, y por eso lleva él el margen de la esquina de
-            // pantalla que antes llevaba LeftSidebarButton.
-            ClockWidget {
-                showDate: (Config.options.bar.verbose && root.useShortenedForm < 2)
+            LeftSidebarButton {
+                id: leftSidebarButton
                 Layout.alignment: Qt.AlignVCenter
                 Layout.leftMargin: Appearance.rounding.screenRounding
+                colBackground: barLeftSideMouseArea.hovered ? Appearance.colors.colLayer1Hover : ColorUtils.transparentize(Appearance.colors.colLayer1Hover, 1)
             }
 
-            // ── isla de espacios de trabajo ─────────────────────────────
+            // ── isla izquierda: recursos + multimedia ────────────────────
             IslandGroup {
+                id: leftIsland
                 outlined: root.islaContorno
                 tint: root.islaTinte
                 corner: root.islaRadio
                 verticalInset: root.islaInset
                 padding: root.islaPadding
                 Layout.alignment: Qt.AlignVCenter
-                Layout.leftMargin: 10
+                // Con LeftSidebarButton oculto esta isla queda la primera de la
+                // fila: sin este margen su contorno se dibuja fuera de la
+                // esquina redondeada de la pantalla. Mismo valor que usa
+                // RippleButton en el extremo contrario, así queda simétrico.
+                Layout.leftMargin: leftSidebarButton.visible ? 0 : Appearance.rounding.screenRounding
+                // Tope estructural, no un número inventado: esta isla no puede
+                // ser más ancha que la sección izquierda entera, que ya está
+                // anclada a `middleSection.left`.  Sin esto, un título de
+                // canción largo la hacía crecer sin freno y cruzaba la barra
+                // por debajo de workspaces, clima y reloj (comprobado con uno
+                // de 130 caracteres).  Media tiene `fillWidth` y `elide`, así
+                // que al toparse es su texto el que se recorta, no los anillos.
+                Layout.minimumWidth: 0
+                Layout.maximumWidth: barLeftSideMouseArea.width
 
-                Workspaces {
-                    id: workspacesWidget
-                    Layout.fillHeight: true
-                    MouseArea {
-                        // Right-click to toggle overview
-                        anchors.fill: parent
-                        acceptedButtons: Qt.RightButton
-
-                        onPressed: event => {
-                            if (event.button === Qt.RightButton) {
-                                GlobalStates.overviewOpen = !GlobalStates.overviewOpen;
-                            }
-                        }
-                    }
+                StatsIsland {
+                    Layout.fillWidth: root.useShortenedForm === 2
                 }
 
-                // El botón de la barra lateral entra en esta isla en vez de ir
-                // suelto contra el borde: ahí es donde lo pone el diseño, justo
-                // detrás de los puntos.
-                LeftSidebarButton {
-                    id: leftSidebarButton
-                    Layout.alignment: Qt.AlignVCenter
-                    Layout.leftMargin: 6
-                    colBackground: barLeftSideMouseArea.hovered ? Appearance.colors.colLayer1Hover : ColorUtils.transparentize(Appearance.colors.colLayer1Hover, 1)
+                MediaIsland {
+                    visible: root.useShortenedForm < 2
+                    Layout.fillWidth: true
                 }
             }
 
@@ -214,18 +203,48 @@ Item { // Bar content region
         }
     }
 
-    // Divisoria estructural, no un contenedor. De sus bordes cuelgan los
-    // anclajes de las dos mitades (`barLeftSideMouseArea.right` y
-    // `barRightSideMouseArea.left`), así que no se puede borrar aunque el
-    // centro quede vacío: con ancho cero es lo que parte la barra por la mitad.
-    Item {
+    // ── isla central: espacios de trabajo + clima ────────────────────────
+    Row {
         id: middleSection
         anchors {
             top: parent.top
             bottom: parent.bottom
             horizontalCenter: parent.horizontalCenter
         }
-        implicitWidth: 0
+        spacing: 6
+
+        IslandGroup {
+            id: middleIsland
+            anchors.verticalCenter: parent.verticalCenter
+            padding: root.islaPadding
+            outlined: root.islaContorno
+            tint: root.islaTinte
+            corner: root.islaRadio
+            verticalInset: root.islaInset
+
+            Workspaces {
+                id: workspacesWidget
+                Layout.fillHeight: true
+                MouseArea {
+                    // Right-click to toggle overview
+                    anchors.fill: parent
+                    acceptedButtons: Qt.RightButton
+
+                    onPressed: event => {
+                        if (event.button === Qt.RightButton) {
+                            GlobalStates.overviewOpen = !GlobalStates.overviewOpen;
+                        }
+                    }
+                }
+            }
+
+            Loader {
+                active: Config.options.bar.weather.enable
+                Layout.alignment: Qt.AlignVCenter
+                Layout.leftMargin: active ? 6 : 0
+                sourceComponent: WeatherBar {}
+            }
+        }
     }
 
     FocusedScrollMouseArea { // Right side | scroll to change volume
@@ -385,6 +404,11 @@ Item { // Bar content region
                 padding: root.islaPadding
                 Layout.alignment: Qt.AlignVCenter
 
+                ClockWidget {
+                    showDate: (Config.options.bar.verbose && root.useShortenedForm < 2)
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
                 UtilButtons {
                     visible: (Config.options.bar.verbose && root.useShortenedForm === 0)
                     Layout.alignment: Qt.AlignVCenter
@@ -427,39 +451,6 @@ Item { // Bar content region
                     visible: root.useShortenedForm === 0
                     Layout.fillHeight: true
                     invertSide: Config?.options.bar.bottom
-                }
-            }
-
-            // ── isla de anillos, multimedia y clima ─────────────────────
-            // Vienen de la izquierda, que se vació para el reloj y los
-            // espacios de trabajo. El tope de ancho se ata ahora a la mitad
-            // DERECHA: es el mismo razonamiento que tenía en la izquierda (un
-            // título de canción largo la hacía crecer sin freno y cruzaba la
-            // barra), sólo que cambia la referencia contra la que se mide.
-            IslandGroup {
-                outlined: root.islaContorno
-                tint: root.islaTinte
-                corner: root.islaRadio
-                verticalInset: root.islaInset
-                padding: root.islaPadding
-                Layout.alignment: Qt.AlignVCenter
-                Layout.minimumWidth: 0
-                Layout.maximumWidth: barRightSideMouseArea.width
-
-                StatsIsland {
-                    Layout.fillWidth: root.useShortenedForm === 2
-                }
-
-                MediaIsland {
-                    visible: root.useShortenedForm < 2
-                    Layout.fillWidth: true
-                }
-
-                Loader {
-                    active: Config.options.bar.weather.enable
-                    Layout.alignment: Qt.AlignVCenter
-                    Layout.leftMargin: active ? 6 : 0
-                    sourceComponent: WeatherBar {}
                 }
             }
 
