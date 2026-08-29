@@ -10,11 +10,20 @@ import qs.modules.common.widgets
 import qs.modules.common.functions
 
 /**
- * Diseño 11 — Islas.
+ * Diseño 11 — Islas sobre banda.
  *
- * La barra deja de ser una banda: no se dibuja `barBackground` (ni su sombra),
- * así que el fondo es el fondo de pantalla y cada grupo flota como una isla con
- * su propio relleno, su contorno y su forma de píldora.
+ * La barra es una banda sólida de borde a borde y encima flotan los grupos como
+ * píldoras rellenas, un punto más claras que la banda y SIN contorno.
+ *
+ * Los tres valores salen de medir el diseño de referencia, no de estimarlos:
+ * banda rgb(26,27,29), píldora rgb(40,40,40), y en el corte del borde de una
+ * píldora se pasa del fondo al relleno en un solo píxel de suavizado — o sea,
+ * no hay anillo de contorno. De ahí `colLayer0` para la banda, `colLayer1` para
+ * la píldora y `islaContorno` en false.
+ *
+ * La banda pide `bar.cornerStyle` a 0: con 1 se dibuja con los márgenes de
+ * Hyprland y esquinas redondeadas, que es el rectángulo flotante con borde, y
+ * la referencia llega hasta x=0 sin margen.
  *
  * Reparto:
  *   izquierda  hora con día, espacios de trabajo y ventana enfocada
@@ -38,7 +47,20 @@ Item { // Bar content region
     readonly property int centerSideModuleWidth: (useShortenedForm == 2) ? Appearance.sizes.barCenterSideModuleWidthHellaShortened : (useShortenedForm == 1) ? Appearance.sizes.barCenterSideModuleWidthShortened : Appearance.sizes.barCenterSideModuleWidth
 
     // Ajustes comunes a todas las islas, en un solo sitio para que no deriven.
-    readonly property color islaTinte: Appearance.colors.colLayer0
+    // Una capa por encima de la banda, que es colLayer0: con el mismo tono
+    // las píldoras se fundirían con ella y no se vería ningún grupo.
+    // `applyAlpha(..., 1)` porque `appearance.transparency` deja la paleta con
+    // alfa y la referencia es opaca: sin esto el fondo de pantalla se cuela y el
+    // color de la banda cambia a lo largo de la barra (medido: de rgb(22,29,41)
+    // sobre la zona azul a rgb(53,33,30) sobre la roja).
+    // colLayer1 a pelo se va a rgb(92,81,82) sobre una banda de rgb(22,21,22):
+    // +70 de salto, cuando la referencia solo sube +14 (banda 26,27,29 contra
+    // píldora 40,40,40). No es un capricho de colLayer1: su valor crudo está
+    // pensado para componerse con alfa (`solveOverlayColor`), así que opacarlo
+    // tal cual lo deja mucho más claro de lo que se ve normalmente.
+    // El 0.8 mezcla 80% banda + 20% colLayer1 y reproduce ese +14.
+    readonly property color islaTinte: ColorUtils.applyAlpha(ColorUtils.mix(Appearance.colors.colLayer0, Appearance.colors.colLayer1, 0.8), 1)
+    readonly property bool islaContorno: false
     readonly property int islaRadio: Appearance.rounding.full
     readonly property int islaInset: 5
     // `Appearance.rounding.full` es 9999: Qt lo acota a la mitad de la altura,
@@ -48,9 +70,29 @@ Item { // Bar content region
     // los dos extremos (medido: la curva se come ~4 px a la altura del texto).
     readonly property int islaPadding: 12
 
-    // Sin `barBackground` ni su sombra: eso es lo que convierte la banda en
-    // islas. El resto del archivo no toca `Config.options.bar.showBackground`,
-    // así que los otros diseños siguen comportándose igual.
+    // Fondo de la barra, igual que en el BarContent de end-4. Se había quitado
+    // cuando esto era solo islas sobre el fondo de pantalla; vuelve porque el
+    // diseño de referencia lleva banda. Sigue colgando de `showBackground` y de
+    // `cornerStyle`, así que no se le roba el control a los ajustes.
+    Loader { // Sombra del fondo
+        active: Config.options.bar.showBackground && Config.options.bar.cornerStyle === 1 && Config.options.bar.floatStyleShadow
+        anchors.fill: barBackground
+        sourceComponent: StyledRectangularShadow {
+            anchors.fill: undefined // El Loader ancla por él; no debe anclarse solo
+            target: barBackground
+        }
+    }
+    Rectangle {
+        id: barBackground
+        anchors {
+            fill: parent
+            margins: Config.options.bar.cornerStyle === 1 ? (Appearance.sizes.hyprlandGapsOut) : 0
+        }
+        color: Config.options.bar.showBackground ? ColorUtils.applyAlpha(Appearance.colors.colLayer0, 1) : "transparent"
+        radius: Config.options.bar.cornerStyle === 1 ? Appearance.rounding.windowRounding : 0
+        border.width: Config.options.bar.cornerStyle === 1 ? 1 : 0
+        border.color: Appearance.colors.colLayer0Border
+    }
 
     FocusedScrollMouseArea { // Left side | scroll to change brightness
         id: barLeftSideMouseArea
@@ -101,7 +143,7 @@ Item { // Bar content region
             // NumberWorkspaceItem cae a su `Circle` de 5 px y del activo se
             // encarga TrailingIndicator, que ya era la píldora alargada.
             IslandGroup {
-                outlined: true
+                outlined: root.islaContorno
                 tint: root.islaTinte
                 corner: root.islaRadio
                 verticalInset: root.islaInset
@@ -150,7 +192,7 @@ Item { // Bar content region
             // (TituloDeslizante recorta y anima), en vez de cortarse.
             // `minimumWidth: 0` es lo que le permite encoger de verdad.
             IslandGroup {
-                outlined: true
+                outlined: root.islaContorno
                 tint: root.islaTinte
                 corner: root.islaRadio
                 verticalInset: root.islaInset
@@ -232,7 +274,7 @@ Item { // Bar content region
             // Lleva los avisos de silencio, micro y notificaciones, y el
             // bluetooth. Antes flotaba suelto al borde: ahora es una isla más.
             IslandGroup {
-                outlined: true
+                outlined: root.islaContorno
                 tint: root.islaTinte
                 corner: root.islaRadio
                 verticalInset: root.islaInset
@@ -340,7 +382,7 @@ Item { // Bar content region
             // ── isla derecha: hora, utilidades, teclado, red, batería, sesión
             IslandGroup {
                 id: rightIsland
-                outlined: true
+                outlined: root.islaContorno
                 tint: root.islaTinte
                 corner: root.islaRadio
                 verticalInset: root.islaInset
@@ -377,7 +419,7 @@ Item { // Bar content region
                 // flotando. `implicitWidth` del propio SysTray es la señal, y
                 // no hace falta importar el servicio para leerla.
                 visible: root.useShortenedForm === 0 && bandeja.implicitWidth > 0
-                outlined: true
+                outlined: root.islaContorno
                 tint: root.islaTinte
                 corner: root.islaRadio
                 verticalInset: root.islaInset
@@ -399,7 +441,7 @@ Item { // Bar content region
             // título de canción largo la hacía crecer sin freno y cruzaba la
             // barra), sólo que cambia la referencia contra la que se mide.
             IslandGroup {
-                outlined: true
+                outlined: root.islaContorno
                 tint: root.islaTinte
                 corner: root.islaRadio
                 verticalInset: root.islaInset

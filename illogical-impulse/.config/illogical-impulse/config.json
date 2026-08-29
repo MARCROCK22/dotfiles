@@ -160,7 +160,7 @@
         },
         "borderless": false,
         "bottom": false,
-        "cornerStyle": 1,
+        "cornerStyle": 0,
         "dgpu": {
             "allowNvidiaSmi": false,
             "chip": true,
