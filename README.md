@@ -10,7 +10,8 @@ Este repo contiene **solo lo que va encima de end-4**, no end-4 entero.
 |---|---|
 | `hypr/` | `custom/*.lua` — mis overrides de Hyprland, y `hypridle.conf`. **No** van aquí `monitors.lua` (es de cada máquina) ni `custom/scripts/__restore_video_wallpaper.sh` (lo genera `switchwall.sh`, y lo hace con un `mv` encima, que sustituye el enlace de stow en cada cambio de fondo) |
 | `illogical-impulse/` | `config.json` del shell (barra, dock, sidebars, temas) |
-| `patches/` | Diffs sobre archivos de end-4. Los aplica `install.py` con `patch` |
+| `quickshell/` | Archivos **enteros** del shell de end-4, con sus hashes en `MANIFEST`. No son enlaces de stow: los copia `install.py` |
+| `patches/` | Legado de la v14, cuando esto eran diffs. Ya no lo usa nada — se puede borrar |
 | `alacritty/` | Terminal |
 | `bin/` | Scripts propios (`recorder`: grabación de pantalla; `reparar-pantallas`: recupera el DisplayPort cuando despierta sin EDID) |
 | `fish/` | Shell |
@@ -33,9 +34,9 @@ python3 install.py
 ```
 
 `install.py` es interactivo: enlaza con **stow** los paquetes de configuración,
-instala los archivos de sistema con sudo, **configura los monitores** leyendo
-`hyprctl monitors all -j`, y aplica los parches de end-4 con `patch`, haciendo
-un `--dry-run` de cada uno antes de tocar nada.
+copia los archivos del shell comprobando sus hashes contra `quickshell/MANIFEST`,
+instala los archivos de sistema con sudo y **configura los monitores** leyendo
+`hyprctl monitors all -j`.
 
 > Si vas a instalar en un equipo nuevo, lee primero **[MIGRACION-PC.md](MIGRACION-PC.md)**.
 > Cubre el dual boot con Windows, los ajustes de BIOS y las diferencias de
@@ -57,22 +58,36 @@ una llamada por pantalla.
 
 ## Lo que hay que revisar a mano
 
-**Los parches de `patches/`.** Son diffs sobre archivos de end-4, no copias
-enteras: así `patch` mete el cambio sobre la versión nueva y conservas también
-las mejoras de end-4. `install.py` hace `--dry-run` de cada uno y solo aplica
-los que encajan; si alguno deja de aplicar, te dice qué línea no cuadra.
+**Los archivos del shell, en `quickshell/`.** Son copias **enteras** de archivos
+de end-4, no diffs. `quickshell/MANIFEST` lleva una línea por archivo con su
+sha256 y su tipo:
 
-Dos de los tres son **bugs ajenos**, no personalización: popups recortados en
-los bordes (end-4) y overview gris (plugin scrolloverview). Si se arreglan
-aguas arriba, esos parches se borran.
+- **`reemplazo`** — el archivo existe en end-4 y lo pisamos.
+- **`nuevo`** — no existe en end-4, es aportación propia. Copiarlo no puede
+  romper nada de end-4.
+
+`install.py` compara los hashes antes de copiar y avisa si alguno no cuadra.
+
+El precio de guardar archivos enteros en vez de diffs es que un `reemplazo`
+**pisa en silencio** lo que end-4 haya cambiado en esa versión. Por eso, tras
+cada actualización de end-4, hay que mirar los cuatro `reemplazo` uno por uno.
+Para actualizar la copia del repo desde la máquina origen, sin pasar por stow:
+
+```bash
+python3 install.py --solo-shell
+```
 
 El ciclo completo tras cada actualización está en **[MANTENIMIENTO.md](MANTENIMIENTO.md)**.
 
-| Archivo | Por qué está modificado |
+| Archivo (`reemplazo`) | Por qué está modificado |
 |---|---|
-| `bar/BarContent.qml` | Disposición: recursos a la izquierda, workspaces centrados, reloj a la derecha |
+| `bar/BarContent.qml` | Diseño propio: banda sólida de borde a borde con los grupos como islas sin contorno. Recursos a la izquierda, workspaces centrados, reloj a la derecha |
+| `common/Config.qml` | Añade al esquema los ajustes de los widgets propios (`alertLine`, `dgpu`, `pulse`, `quickControls`…). Solo suma, no quita nada de end-4 |
 | `bar/StyledPopup.qml` | **Bug de end-4**: `margins.left` no se acota a la pantalla, los popups se recortan cerca de un borde |
 | `background/Background.qml` | **Bug de scrolloverview**: el plugin solo dibuja `LAYER_BACKGROUND` y end-4 pinta en `WlrLayer.Bottom`, así que el overview salía gris |
+
+Los dos últimos son **bugs ajenos**, no personalización. Si se arreglan aguas
+arriba, esos dos archivos salen del repo.
 
 **El plugin del overview.** No es un paquete de pacman:
 
