@@ -16,10 +16,11 @@ import qs.modules.common.functions
  * así que el fondo es el fondo de pantalla y cada grupo flota como una isla con
  * su propio relleno, su contorno y su forma de píldora.
  *
- * Reparto pedido:
- *   izquierda  RAM / GPU / swap en anillos + multimedia
- *   centro     espacios de trabajo + clima
- *   derecha    hora con día, utilidades, teclado, batería, red y sesión
+ * Reparto:
+ *   izquierda  hora con día, espacios de trabajo y ventana enfocada
+ *   centro     vacío
+ *   derecha    anillos, multimedia, clima, avisos, utilidades, teclado,
+ *              red, batería y sesión
  *
  * Todo lo que no sean los espacios de trabajo tiene detalle al pasar el ratón.
  * El de multimedia además se puede TOCAR: controles, búsqueda y
@@ -85,44 +86,53 @@ Item { // Bar content region
             anchors.fill: parent
             spacing: 0
 
-            LeftSidebarButton {
-                id: leftSidebarButton
+            // El reloj abre la fila, suelto y sin isla: es el ancla del
+            // extremo izquierdo, y por eso lleva él el margen de la esquina de
+            // pantalla que antes llevaba LeftSidebarButton.
+            ClockWidget {
+                showDate: (Config.options.bar.verbose && root.useShortenedForm < 2)
                 Layout.alignment: Qt.AlignVCenter
                 Layout.leftMargin: Appearance.rounding.screenRounding
-                colBackground: barLeftSideMouseArea.hovered ? Appearance.colors.colLayer1Hover : ColorUtils.transparentize(Appearance.colors.colLayer1Hover, 1)
             }
 
-            // ── isla izquierda: recursos + multimedia ────────────────────
+            // ── isla de espacios de trabajo ─────────────────────────────
+            // Salen como puntos sin tocar Workspaces.qml: con
+            // `alwaysShowNumbers` y `showAppIcons` apagados en config.json,
+            // NumberWorkspaceItem cae a su `Circle` de 5 px y del activo se
+            // encarga TrailingIndicator, que ya era la píldora alargada.
             IslandGroup {
-                id: leftIsland
                 outlined: true
                 tint: root.islaTinte
                 corner: root.islaRadio
                 verticalInset: root.islaInset
                 padding: root.islaPadding
                 Layout.alignment: Qt.AlignVCenter
-                // Con LeftSidebarButton oculto esta isla queda la primera de la
-                // fila: sin este margen su contorno se dibuja fuera de la
-                // esquina redondeada de la pantalla. Mismo valor que usa
-                // RippleButton en el extremo contrario, así queda simétrico.
-                Layout.leftMargin: leftSidebarButton.visible ? 0 : Appearance.rounding.screenRounding
-                // Tope estructural, no un número inventado: esta isla no puede
-                // ser más ancha que la sección izquierda entera, que ya está
-                // anclada a `middleSection.left`.  Sin esto, un título de
-                // canción largo la hacía crecer sin freno y cruzaba la barra
-                // por debajo de workspaces, clima y reloj (comprobado con uno
-                // de 130 caracteres).  Media tiene `fillWidth` y `elide`, así
-                // que al toparse es su texto el que se recorta, no los anillos.
-                Layout.minimumWidth: 0
-                Layout.maximumWidth: barLeftSideMouseArea.width
+                Layout.leftMargin: 10
 
-                StatsIsland {
-                    Layout.fillWidth: root.useShortenedForm === 2
+                Workspaces {
+                    id: workspacesWidget
+                    Layout.fillHeight: true
+                    MouseArea {
+                        // Right-click to toggle overview
+                        anchors.fill: parent
+                        acceptedButtons: Qt.RightButton
+
+                        onPressed: event => {
+                            if (event.button === Qt.RightButton) {
+                                GlobalStates.overviewOpen = !GlobalStates.overviewOpen;
+                            }
+                        }
+                    }
                 }
 
-                MediaIsland {
-                    visible: root.useShortenedForm < 2
-                    Layout.fillWidth: true
+                // El botón de la barra lateral entra en esta isla en vez de ir
+                // suelto contra el borde: ahí es donde lo pone el diseño, justo
+                // detrás de los puntos.
+                LeftSidebarButton {
+                    id: leftSidebarButton
+                    Layout.alignment: Qt.AlignVCenter
+                    Layout.leftMargin: 6
+                    colBackground: barLeftSideMouseArea.hovered ? Appearance.colors.colLayer1Hover : ColorUtils.transparentize(Appearance.colors.colLayer1Hover, 1)
                 }
             }
 
@@ -166,48 +176,18 @@ Item { // Bar content region
         }
     }
 
-    // ── isla central: espacios de trabajo + clima ────────────────────────
-    Row {
+    // Divisoria estructural, no un contenedor. De sus bordes cuelgan los
+    // anclajes de las dos mitades (`barLeftSideMouseArea.right` y
+    // `barRightSideMouseArea.left`), así que no se puede borrar aunque el
+    // centro quede vacío: con ancho cero es lo que parte la barra por la mitad.
+    Item {
         id: middleSection
         anchors {
             top: parent.top
             bottom: parent.bottom
             horizontalCenter: parent.horizontalCenter
         }
-        spacing: 6
-
-        IslandGroup {
-            id: middleIsland
-            anchors.verticalCenter: parent.verticalCenter
-            padding: root.islaPadding
-            outlined: true
-            tint: root.islaTinte
-            corner: root.islaRadio
-            verticalInset: root.islaInset
-
-            Workspaces {
-                id: workspacesWidget
-                Layout.fillHeight: true
-                MouseArea {
-                    // Right-click to toggle overview
-                    anchors.fill: parent
-                    acceptedButtons: Qt.RightButton
-
-                    onPressed: event => {
-                        if (event.button === Qt.RightButton) {
-                            GlobalStates.overviewOpen = !GlobalStates.overviewOpen;
-                        }
-                    }
-                }
-            }
-
-            Loader {
-                active: Config.options.bar.weather.enable
-                Layout.alignment: Qt.AlignVCenter
-                Layout.leftMargin: active ? 6 : 0
-                sourceComponent: WeatherBar {}
-            }
-        }
+        implicitWidth: 0
     }
 
     FocusedScrollMouseArea { // Right side | scroll to change volume
@@ -367,11 +347,6 @@ Item { // Bar content region
                 padding: root.islaPadding
                 Layout.alignment: Qt.AlignVCenter
 
-                ClockWidget {
-                    showDate: (Config.options.bar.verbose && root.useShortenedForm < 2)
-                    Layout.alignment: Qt.AlignVCenter
-                }
-
                 UtilButtons {
                     visible: (Config.options.bar.verbose && root.useShortenedForm === 0)
                     Layout.alignment: Qt.AlignVCenter
@@ -414,6 +389,39 @@ Item { // Bar content region
                     visible: root.useShortenedForm === 0
                     Layout.fillHeight: true
                     invertSide: Config?.options.bar.bottom
+                }
+            }
+
+            // ── isla de anillos, multimedia y clima ─────────────────────
+            // Vienen de la izquierda, que se vació para el reloj y los
+            // espacios de trabajo. El tope de ancho se ata ahora a la mitad
+            // DERECHA: es el mismo razonamiento que tenía en la izquierda (un
+            // título de canción largo la hacía crecer sin freno y cruzaba la
+            // barra), sólo que cambia la referencia contra la que se mide.
+            IslandGroup {
+                outlined: true
+                tint: root.islaTinte
+                corner: root.islaRadio
+                verticalInset: root.islaInset
+                padding: root.islaPadding
+                Layout.alignment: Qt.AlignVCenter
+                Layout.minimumWidth: 0
+                Layout.maximumWidth: barRightSideMouseArea.width
+
+                StatsIsland {
+                    Layout.fillWidth: root.useShortenedForm === 2
+                }
+
+                MediaIsland {
+                    visible: root.useShortenedForm < 2
+                    Layout.fillWidth: true
+                }
+
+                Loader {
+                    active: Config.options.bar.weather.enable
+                    Layout.alignment: Qt.AlignVCenter
+                    Layout.leftMargin: active ? 6 : 0
+                    sourceComponent: WeatherBar {}
                 }
             }
 
