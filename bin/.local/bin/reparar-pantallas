@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Devuelve a su modo las pantallas que despiertan sin EDID.
+#
+# El DisplayPort de esta maquina lo pierde al volver de DPMS: el driver se queda
+# sin la lista de modos del monitor y Hyprland cae a 640x480, su modo de rescate.
+# El HDMI no lo hace. Apagar el conector y recargar obliga a renegociar el
+# enlace, y esa segunda lectura si trae el EDID (verificado el 20260829: volvio
+# el nombre, el numero de serie y los 26 modos del Samsung).
+#
+# Lo llama hypridle al despertar y despues de suspender. Es idempotente: si
+# todas las pantallas vinieron bien no toca nada, asi que puede ir siempre.
+#
+#   reparar-pantallas              comprueba y repara solo lo roto
+#   reparar-pantallas --forzar     repara todas, aunque parezcan sanas
+#   reparar-pantallas --forzar DP-1
+set -euo pipefail
+
+ESPERA_ASENTADO=3     # hypridle dispara al primer movimiento, el enlace tarda
+INTENTOS=3
+
+# Sin Hyprland delante no hay nada que hacer, y hypridle no deberia ver un fallo.
+hyprctl monitors -j >/dev/null 2>&1 || exit 0
+
+rotas() {
+    # Una pantalla sana anuncia decenas de modos; sin EDID al driver solo le
+    # queda el de rescate. Contar modos es mas fiable que mirar el nombre, que
+    # pasa a ser el de la GPU ("Nvidia 0x0000") y no distingue una de otra.
+    hyprctl monitors -j | jq -r '.[] | select((.availableModes | length) < 2) | .name'
+}
+
+reparar() {
+    for m in "$@"; do
+        hyprctl eval "hl.monitor({ output = \"$m\", disabled = true })" >/dev/null
+    done
+    sleep 1
+    # reload reaplica monitors.lua y las vuelve a levantar. El apagado previo es
+    # imprescindible: sin un cambio que aplicar, reload no toca el conector.
+    hyprctl reload >/dev/null
+    sleep 2
+}
+
+if [ "${1:-}" = "--forzar" ]; then
+    shift
+    if [ $# -gt 0 ]; then
+        reparar "$@"
+    else
+        mapfile -t todas < <(hyprctl monitors -j | jq -r '.[].name')
+        reparar "${todas[@]}"
+    fi
+    exit 0
+fi
+
+sleep "$ESPERA_ASENTADO"
+
+for _ in $(seq "$INTENTOS"); do
+    mapfile -t lista < <(rotas)
+    [ ${#lista[@]} -eq 0 ] && exit 0
+    reparar "${lista[@]}"
+done
+
+mapfile -t lista < <(rotas)
+if [ ${#lista[@]} -gt 0 ]; then
+    notify-send -u critical "Pantalla sin EDID" \
+        "No se pudo recuperar: ${lista[*]}. Apaga y enciende el monitor por su boton."
+    exit 1
+fi

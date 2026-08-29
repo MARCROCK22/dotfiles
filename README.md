@@ -8,11 +8,11 @@ Este repo contiene **solo lo que va encima de end-4**, no end-4 entero.
 
 | Carpeta | Contenido |
 |---|---|
-| `hypr/` | `custom/*.lua` — mis overrides de Hyprland. `monitors.lua` **no** está aquí: es de cada máquina |
+| `hypr/` | `custom/*.lua` — mis overrides de Hyprland, y `hypridle.conf`. `monitors.lua` **no** está aquí: es de cada máquina |
 | `illogical-impulse/` | `config.json` del shell (barra, dock, sidebars, temas) |
 | `patches/` | Diffs sobre archivos de end-4. Los aplica `install.py` con `patch` |
 | `alacritty/` | Terminal |
-| `bin/` | Scripts propios (`recorder`: grabación de pantalla) |
+| `bin/` | Scripts propios (`recorder`: grabación de pantalla; `reparar-pantallas`: recupera el DisplayPort cuando despierta sin EDID) |
 | `fish/` | Shell |
 | `fastfetch/` | Resumen del sistema al abrir la terminal |
 | `starship/` | Prompt |
