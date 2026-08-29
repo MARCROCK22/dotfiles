@@ -37,8 +37,13 @@ Item {
     property int pausaFinalMs: 1200
     property real pixelesPorSegundo: 45
 
-    implicitWidth: colLayout.implicitWidth
-    implicitHeight: colLayout.implicitHeight
+    // La clase de la ventana, en un solo sitio: la usan el icono y la primera
+    // línea del texto. Deducida por separado en cada uno, podrían discrepar en
+    // el instante en que cambia el foco.
+    readonly property string claseApp: (root.focusingThisMonitor && root.activeWindow?.activated && root.biggestWindow ? root.activeWindow?.appId : root.biggestWindow?.class) ?? ""
+
+    implicitWidth: filaLayout.implicitWidth
+    implicitHeight: filaLayout.implicitHeight
 
     component Deslizante: Item {
         id: cont
@@ -102,25 +107,41 @@ Item {
         }
     }
 
-    ColumnLayout {
-        id: colLayout
+    RowLayout {
+        id: filaLayout
         anchors.verticalCenter: parent.verticalCenter
         anchors.left: parent.left
         anchors.right: parent.right
-        spacing: -4
+        spacing: 8
 
-        Deslizante {
-            Layout.fillWidth: true
-            tamanoTexto: Appearance.font.pixelSize.smaller
-            colorTexto: Appearance.colors.colSubtext
-            contenido: root.focusingThisMonitor && root.activeWindow?.activated && root.biggestWindow ? root.activeWindow?.appId : ((root.biggestWindow?.class) ?? Translation.tr("Desktop"))
+        // El icono de la app, delante del texto. Se apaga si no hay clase, que
+        // es el caso del escritorio vacío: si no, quedaría el hueco reservado
+        // con el icono de reemplazo dentro.
+        AppIcon {
+            visible: root.claseApp !== ""
+            implicitSize: 22
+            source: Quickshell.iconPath(AppSearch.guessIcon(root.claseApp), "image-missing")
+            Layout.alignment: Qt.AlignVCenter
         }
 
-        Deslizante {
+        ColumnLayout {
+            id: colLayout
             Layout.fillWidth: true
-            tamanoTexto: Appearance.font.pixelSize.small
-            colorTexto: Appearance.colors.colOnLayer0
-            contenido: root.focusingThisMonitor && root.activeWindow?.activated && root.biggestWindow ? root.activeWindow?.title : ((root.biggestWindow?.title) ?? `${Translation.tr("Workspace")} ${monitor?.activeWorkspace?.id ?? 1}`)
+            spacing: -4
+
+            Deslizante {
+                Layout.fillWidth: true
+                tamanoTexto: Appearance.font.pixelSize.smaller
+                colorTexto: Appearance.colors.colSubtext
+                contenido: root.claseApp !== "" ? root.claseApp : Translation.tr("Desktop")
+            }
+
+            Deslizante {
+                Layout.fillWidth: true
+                tamanoTexto: Appearance.font.pixelSize.small
+                colorTexto: Appearance.colors.colOnLayer0
+                contenido: root.focusingThisMonitor && root.activeWindow?.activated && root.biggestWindow ? root.activeWindow?.title : ((root.biggestWindow?.title) ?? `${Translation.tr("Workspace")} ${monitor?.activeWorkspace?.id ?? 1}`)
+            }
         }
     }
 }
