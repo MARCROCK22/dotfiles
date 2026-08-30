@@ -14,10 +14,14 @@ import Quickshell.Io
  * aquí. Si el equipo se pasa alguna vez a modo híbrido de verdad, subir
  * `gpuIntervalMs` o poner `gpuEnabled: false`.
  *
- * Temperatura de CPU: se resuelve la ruta de `coretemp` UNA vez con un
- * proceso, porque la numeración de `/sys/class/hwmon/hwmonN` cambia entre
- * arranques y fijarla sería un fallo silencioso tras el primer reinicio.
- * Después son lecturas de archivo, sin procesos.
+ * Temperatura de CPU: se resuelve la ruta del sensor UNA vez con un proceso,
+ * porque la numeración de `/sys/class/hwmon/hwmonN` cambia entre arranques y
+ * fijarla sería un fallo silencioso tras el primer reinicio. Después son
+ * lecturas de archivo, sin procesos.
+ *
+ * Se prueban varios nombres de driver, no solo `coretemp`: ése es el de INTEL,
+ * y en esta máquina —un Ryzen 7 5800XT— el sensor se llama `k10temp`. Buscando
+ * solo coretemp la temperatura salía «--» siempre, sin avisar de nada.
  */
 Item {
     id: root
@@ -62,9 +66,20 @@ Item {
     property bool cascoDisponible: true
     property int cascoNivel: -1              // 0..100, -1 = sin dato
     property bool cascoCargando: false
+    property int cascoVoltajeMv: -1
+    property int cascoMinutos: -1            // autonomía que estima el propio casco
 
     readonly property real cascoFraccion: cascoNivel >= 0 ? (cascoNivel / 100) : 0
     readonly property bool cascoHayDato: root.cascoDisponible && root.cascoNivel >= 0
+
+    // Los minutos crudos no se leen de un vistazo: 783 no dice nada, «13 h 3 min» sí.
+    readonly property string cascoAutonomia: {
+        if (root.cascoMinutos < 0)
+            return "--";
+        const h = Math.floor(root.cascoMinutos / 60);
+        const m = root.cascoMinutos % 60;
+        return h > 0 ? `${h} h ${m} min` : `${m} min`;
+    }
 
     // nvidia-smi devuelve "[N/A]" en campos que la GPU no reporta; parseFloat
     // de eso da NaN y NaN se propaga a toda la UI sin avisar. -1 = sin dato.
@@ -136,12 +151,20 @@ Item {
                     // dato en vez de dejar el ultimo, que seria mentir.
                     if (b.status === "BATTERY_UNAVAILABLE") {
                         root.cascoNivel = -1;
+                        root.cascoVoltajeMv = -1;
+                        root.cascoMinutos = -1;
                         return;
                     }
                     root.cascoCargando = (b.status === "BATTERY_CHARGING");
                     root.cascoNivel = b.level;
+                    // Los dos pueden faltar segun el estado; -1 = sin dato, que
+                    // es lo que la UI sabe rotular como «--».
+                    root.cascoVoltajeMv = b.voltage_mv ?? -1;
+                    root.cascoMinutos = b.time_to_empty_min ?? -1;
                 } catch (e) {
                     root.cascoNivel = -1;
+                    root.cascoVoltajeMv = -1;
+                    root.cascoMinutos = -1;
                 }
             }
         }
@@ -157,11 +180,11 @@ Item {
             cascoProc.running = true
     }
 
-    // ── resolución de la ruta de coretemp, una sola vez ───────────────────
+    // ── resolución de la ruta del sensor de CPU, una sola vez ─────────────
     Process {
         running: true
         command: ["sh", "-c",
-            "for d in /sys/class/hwmon/hwmon*; do [ \"$(cat $d/name 2>/dev/null)\" = coretemp ] && { echo $d/temp1_input; break; }; done; nproc"]
+            "for n in k10temp coretemp zenpower; do for d in /sys/class/hwmon/hwmon*; do [ \"$(cat $d/name 2>/dev/null)\" = \"$n\" ] && { echo $d/temp1_input; break 2; }; done; done; nproc"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const l = text.trim().split("\n");

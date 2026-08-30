@@ -63,42 +63,6 @@ StyledPopup {
                 }
             }
         }
-
-        // ── Swap ─────────────────────────────────────────────────────────
-        Column {
-            visible: ResourceUsage.swapTotal > 0
-            anchors.top: parent.top
-            spacing: 8
-
-            StyledPopupHeaderRow {
-                icon: "swap_horiz"
-                label: "Swap"
-            }
-            Column {
-                spacing: 4
-                StyledPopupValueRow {
-                    icon: "clock_loader_60"
-                    label: "Usada:"
-                    value: root.gb(ResourceUsage.swapUsed)
-                }
-                StyledPopupValueRow {
-                    icon: "check_circle"
-                    label: "Libre:"
-                    value: root.gb(ResourceUsage.swapFree)
-                }
-                StyledPopupValueRow {
-                    icon: "empty_dashboard"
-                    label: "Total:"
-                    value: root.gb(ResourceUsage.swapTotal)
-                }
-                StyledPopupValueRow {
-                    icon: "percent"
-                    label: "Uso:"
-                    value: root.pct(ResourceUsage.swapUsedPercentage)
-                }
-            }
-        }
-
         // ── GPU ──────────────────────────────────────────────────────────
         Column {
             visible: root.showGpu && root.probe.gpuHasData
@@ -150,7 +114,40 @@ StyledPopup {
                 }
             }
         }
+        // ── Swap ─────────────────────────────────────────────────────────
+        Column {
+            visible: ResourceUsage.swapTotal > 0
+            anchors.top: parent.top
+            spacing: 8
 
+            StyledPopupHeaderRow {
+                icon: "swap_horiz"
+                label: "Swap"
+            }
+            Column {
+                spacing: 4
+                StyledPopupValueRow {
+                    icon: "clock_loader_60"
+                    label: "Usada:"
+                    value: root.gb(ResourceUsage.swapUsed)
+                }
+                StyledPopupValueRow {
+                    icon: "check_circle"
+                    label: "Libre:"
+                    value: root.gb(ResourceUsage.swapFree)
+                }
+                StyledPopupValueRow {
+                    icon: "empty_dashboard"
+                    label: "Total:"
+                    value: root.gb(ResourceUsage.swapTotal)
+                }
+                StyledPopupValueRow {
+                    icon: "percent"
+                    label: "Uso:"
+                    value: root.pct(ResourceUsage.swapUsedPercentage)
+                }
+            }
+        }
         // ── CPU ──────────────────────────────────────────────────────────
         Column {
             visible: root.showCpu
@@ -177,6 +174,42 @@ StyledPopup {
                     icon: "grid_view"
                     label: "Hilos:"
                     value: root.probe.cpuCores > 0 ? `${root.probe.cpuCores}` : "--"
+                }
+            }
+        }
+
+        // ── casco ────────────────────────────────────────────────────────
+        // El anillo solo da el porcentaje; lo interesante es la AUTONOMÍA, que
+        // headsetcontrol calcula y no se ve en ningún otro sitio. Todo esto
+        // sale del mismo JSON que ya se pide para el anillo, así que no cuesta
+        // ni una llamada más.
+        Column {
+            anchors.top: parent.top
+            spacing: 8
+            visible: root.probe.cascoHayDato
+
+            StyledPopupHeaderRow {
+                icon: "headphones"
+                label: "Casco"
+            }
+            Column {
+                spacing: 4
+                StyledPopupValueRow {
+                    icon: "battery_full"
+                    label: "Batería:"
+                    value: `${root.probe.cascoNivel}%`
+                }
+                StyledPopupValueRow {
+                    icon: root.probe.cascoCargando ? "bolt" : "schedule"
+                    label: root.probe.cascoCargando ? "Estado:" : "Autonomía:"
+                    // Cargando no tiene sentido dar una autonomía que baja a
+                    // cero: se dice que está cargando y punto.
+                    value: root.probe.cascoCargando ? "Cargando" : root.probe.cascoAutonomia
+                }
+                StyledPopupValueRow {
+                    icon: "electric_bolt"
+                    label: "Voltaje:"
+                    value: `${root.probe.cascoVoltajeMv} mV`
                 }
             }
         }
