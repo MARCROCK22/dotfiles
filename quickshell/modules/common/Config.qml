@@ -485,6 +485,10 @@ Singleton {
             property JsonObject media: JsonObject {
                 // Attempt to remove dupes (the aggregator playerctl one and browsers' native ones when there's plasma browser integration)
                 property bool filterDuplicatePlayers: true
+                // Anadido: el artista detras del titulo en la barra. En false
+                // la isla solo pone el nombre de la cancion, que es lo pedido,
+                // y asi el hueco lo aprovecha el titulo antes de recortarse.
+                property bool showArtist: false
             }
 
             property JsonObject networking: JsonObject {

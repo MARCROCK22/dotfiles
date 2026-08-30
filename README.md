@@ -82,7 +82,8 @@ El ciclo completo tras cada actualización está en **[MANTENIMIENTO.md](MANTENI
 | Archivo (`reemplazo`) | Por qué está modificado |
 |---|---|
 | `bar/BarContent.qml` | Diseño propio: banda sólida de borde a borde con los grupos como islas sin contorno. Recursos a la izquierda, workspaces centrados, reloj a la derecha |
-| `common/Config.qml` | Añade al esquema los ajustes de los widgets propios (`alertLine`, `dgpu`, `pulse`, `quickControls`…). Solo suma, no quita nada de end-4 |
+| `common/Config.qml` | Añade al esquema los ajustes de los widgets propios (`alertLine`, `dgpu`, `pulse`, `quickControls`, `media.showArtist`…). Solo suma, no quita nada de end-4 |
+| `bar/Media.qml` | **Una sola línea**: el artista detrás del título pasa a colgar de `bar.media.showArtist`. Se adoptó el archivo entero por ese cambio; el diff es de una línea a propósito, para re-aplicarlo de un vistazo |
 | `bar/StyledPopup.qml` | **Bug de end-4**: `margins.left` no se acota a la pantalla, los popups se recortan cerca de un borde |
 | `background/Background.qml` | **Bug de scrolloverview**: el plugin solo dibuja `LAYER_BACKGROUND` y end-4 pinta en `WlrLayer.Bottom`, así que el overview salía gris |
 

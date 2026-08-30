@@ -47,6 +47,25 @@ Item {
     property int cpuTempC: -1
     property int cpuCores: 0
 
+    // ── casco inalambrico ────────────────────────────────────────────────
+    // Un minuto es de sobra y no es un numero al azar: con `time_to_empty` en
+    // 774 min para un 89%, la bateria baja un 1% cada 8-9 minutos. Preguntar
+    // cada minuto no se pierde ni un escalon y cuesta 37 ms medidos, o sea un
+    // 0,06% de un nucleo.
+    //
+    // Se sondea porque NO hay alternativa: se comprobo que el casco no manda
+    // nada por su cuenta mientras se descarga. Con el dispositivo HID en
+    // exclusiva, cero informes en 90 s. Los informes de voltaje que si se ven
+    // (`11 ff 08 00 <mV>`) solo aparecen MIENTRAS CARGA, asi que no sirven
+    // para mover un indicador que tiene que actualizarse justo al usarlo.
+    property int cascoIntervalMs: 60000
+    property bool cascoDisponible: true
+    property int cascoNivel: -1              // 0..100, -1 = sin dato
+    property bool cascoCargando: false
+
+    readonly property real cascoFraccion: cascoNivel >= 0 ? (cascoNivel / 100) : 0
+    readonly property bool cascoHayDato: root.cascoDisponible && root.cascoNivel >= 0
+
     // nvidia-smi devuelve "[N/A]" en campos que la GPU no reporta; parseFloat
     // de eso da NaN y NaN se propaga a toda la UI sin avisar. -1 = sin dato.
     function num(s) {
@@ -97,6 +116,45 @@ Item {
         // Sin solapes: si la llamada anterior sigue viva, se salta este turno.
         onTriggered: if (!smiProc.running)
             smiProc.running = true
+    }
+
+    Process {
+        id: cascoProc
+        command: ["env", "LC_ALL=C", "timeout", "5", "headsetcontrol", "-o", "json"]
+        onExited: (exitCode, exitStatus) => {
+            // Solo 127 (no existe el binario) apaga esto. Un codigo distinto
+            // suele ser "ahora mismo no hay casco", y eso se arregla solo en
+            // cuanto lo enciendas: apagar el Timer ahi lo dejaria muerto.
+            if (exitCode === 127)
+                root.cascoDisponible = false;
+        }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const b = JSON.parse(text).devices[0].battery;
+                    // UNAVAILABLE = apagado o fuera de alcance. Se borra el
+                    // dato en vez de dejar el ultimo, que seria mentir.
+                    if (b.status === "BATTERY_UNAVAILABLE") {
+                        root.cascoNivel = -1;
+                        return;
+                    }
+                    root.cascoCargando = (b.status === "BATTERY_CHARGING");
+                    root.cascoNivel = b.level;
+                } catch (e) {
+                    root.cascoNivel = -1;
+                }
+            }
+        }
+    }
+
+    Timer {
+        running: root.cascoDisponible
+        interval: root.cascoIntervalMs
+        repeat: true
+        triggeredOnStart: true
+        // Misma guarda que la GPU: si la anterior sigue viva, se salta el turno.
+        onTriggered: if (!cascoProc.running)
+            cascoProc.running = true
     }
 
     // ── resolución de la ruta de coretemp, una sola vez ───────────────────
