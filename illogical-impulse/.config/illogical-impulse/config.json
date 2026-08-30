@@ -260,8 +260,8 @@
         "vertical": false,
         "weather": {
             "city": "",
-            "enable": true,
-            "enableGPS": true,
+            "enable": false,
+            "enableGPS": false,
             "fetchInterval": 10,
             "useUSCS": false
         },
