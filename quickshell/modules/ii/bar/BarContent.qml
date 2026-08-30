@@ -326,13 +326,15 @@ Item { // Bar content region
                 spacing: 12
                 layoutDirection: Qt.LeftToRight
 
+                // Revealer ya se dimensiona solo a partir de su hijo
+                // (`childrenRect`), asi que NO se le pone implicitWidth ni
+                // fillHeight: con fillHeight se estiraba a los 45 px de la
+                // barra y el icono, que mide 20 y no lleva anclaje, se quedaba
+                // pegado ARRIBA en vez de centrado.
                 Revealer {
                     reveal: Notifications.silent || Notifications.unread > 0
-                    Layout.fillHeight: true
-                    implicitWidth: reveal ? notificationUnreadCount.implicitWidth : 0
-                    NotificationUnreadCount {
-                        id: notificationUnreadCount
-                    }
+                    Layout.alignment: Qt.AlignVCenter
+                    NotificationUnreadCount {}
                 }
 
                 NetworkIsland {
