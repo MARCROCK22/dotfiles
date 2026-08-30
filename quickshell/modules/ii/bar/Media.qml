@@ -13,7 +13,23 @@ Item {
     id: root
     property bool borderless: Config.options.bar.borderless
     readonly property MprisPlayer activePlayer: MprisController.activePlayer
-    readonly property string cleanedTitle: StringUtils.cleanMusicTitle(activePlayer?.trackTitle) || Translation.tr("No media")
+    // TERCER cambio sobre end-4. Antes esto era el titulo del reproductor
+    // activo a secas, sin mirar si estaba sonando, asi que al parar la barra se
+    // quedaba clavada con lo ultimo. Caso real que lo destapo -dos
+    // reproductores MPRIS, los dos parados-:
+    //
+    //     firefox (audio de WhatsApp)  Paused   titulo "WhatsApp"
+    //     spotify                      Paused   titulo "Escapism (feat...)"
+    //
+    // El de Firefox era legitimo: un audio de WhatsApp que ya habia terminado.
+    // El problema no es de donde viene el titulo, es que se seguia enseniando
+    // despues de parar, y encima MprisController prefirio ese, asi que la barra
+    // ponia «WhatsApp» como si estuviera sonando algo.
+    //
+    // El texto va literal y no por `Translation.tr`: no existe el fichero de
+    // traduccion es_MX -el shell avisa al arrancar-, asi que tr() devolveria
+    // el original en ingles, que es justo lo que no se quiere.
+    readonly property string cleanedTitle: activePlayer?.playbackState === MprisPlaybackState.Playing ? (StringUtils.cleanMusicTitle(activePlayer?.trackTitle) || "Nada reproduciendo") : "Nada reproduciendo"
 
     Layout.fillHeight: true
     implicitWidth: rowLayout.implicitWidth + rowLayout.spacing * 2

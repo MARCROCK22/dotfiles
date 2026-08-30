@@ -83,7 +83,7 @@ El ciclo completo tras cada actualización está en **[MANTENIMIENTO.md](MANTENI
 |---|---|
 | `bar/BarContent.qml` | Diseño propio: banda sólida de borde a borde con los grupos como islas sin contorno. Recursos a la izquierda, workspaces centrados, reloj a la derecha |
 | `common/Config.qml` | Añade al esquema los ajustes de los widgets propios (`alertLine`, `dgpu`, `pulse`, `quickControls`, `media.showArtist`…). Solo suma, no quita nada de end-4 |
-| `bar/Media.qml` | Dos cambios. **Uno**: el artista detrás del título pasa a colgar de `bar.media.showArtist`. **Dos**, y es un bug de end-4: el texto tenía un `width:` explícito dentro de un Layout que restaba `CircularProgress.size`, una referencia estática que no resuelve; daba NaN y `elide` no recortaba, así que al apretar la isla el texto se dibujaba encima de los anillos |
+| `bar/Media.qml` | Tres cambios. **Cero**: con nada sonando pone «Nada reproduciendo» en vez de quedarse clavado en lo último. **Uno**: el artista detrás del título pasa a colgar de `bar.media.showArtist`. **Dos**, y es un bug de end-4: el texto tenía un `width:` explícito dentro de un Layout que restaba `CircularProgress.size`, una referencia estática que no resuelve; daba NaN y `elide` no recortaba, así que al apretar la isla el texto se dibujaba encima de los anillos |
 | `bar/StyledPopup.qml` | **Bug de end-4**: `margins.left` no se acota a la pantalla, los popups se recortan cerca de un borde |
 | `background/Background.qml` | **Bug de scrolloverview**: el plugin solo dibuja `LAYER_BACKGROUND` y end-4 pinta en `WlrLayer.Bottom`, así que el overview salía gris |
 

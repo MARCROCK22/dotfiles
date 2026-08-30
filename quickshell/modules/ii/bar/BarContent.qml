@@ -162,9 +162,18 @@ Item { // Bar content region
                 //
                 // El suelo son los anillos: pueden quedarse sin texto de
                 // canción al lado, pero no desaparecer.
+                // El maximo es el CONTENIDO, no el hueco disponible. Con el
+                // hueco, un titulo corto dejaba la isla estirada y el texto
+                // flotando centrado en medio de un vacio (Media lo centra), que
+                // es como se veia con «WhatsApp» de titulo.
+                //
+                // Asi la isla crece hasta lo que tiene que enseniar y para. La
+                // del titulo ya estaba topada igual, con lo cual las dos son
+                // simetricas: crecen con su contenido y, cuando entre las dos
+                // no caben, `fillWidth` reparte el deficit.
                 Layout.fillWidth: true
                 Layout.minimumWidth: anillos.implicitWidth + root.islaPadding * 2
-                Layout.maximumWidth: barLeftSideMouseArea.width
+                Layout.maximumWidth: anillos.implicitWidth + (reproductor.visible ? reproductor.implicitWidth + 4 : 0) + root.islaPadding * 2
 
                 StatsIsland {
                     id: anillos
@@ -172,6 +181,7 @@ Item { // Bar content region
                 }
 
                 MediaIsland {
+                    id: reproductor
                     visible: root.useShortenedForm < 2
                     Layout.fillWidth: true
                 }
