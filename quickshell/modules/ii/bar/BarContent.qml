@@ -75,44 +75,25 @@ Item { // Bar content region
     // los dos extremos (medido: la curva se come ~4 px a la altura del texto).
     readonly property int islaPadding: 12
 
-    // Spotify sonando AHORA. De esto cuelgan dos cosas a la vez: aparece el
-    // reproductor en el centro y se esconde la ventana enfocada de la
-    // izquierda. Va en UNA sola propiedad a proposito: si cada uno lo dedujera
-    // por su cuenta podrian discrepar un instante y verse las dos, o ninguna.
-    //
-    // Se mira el nombre de dbus y la identidad: `org.mpris.MediaPlayer2.spotify`
-    // es lo que publica, pero el cliente puede cambiar y la identidad («Spotify»)
-    // sirve de red.
-    readonly property bool sonandoSpotify: {
-        const p = MprisController.activePlayer;
-        if (!p || p.playbackState !== MprisPlaybackState.Playing)
-            return false;
-        return `${p.dbusName ?? ""} ${p.identity ?? ""}`.toLowerCase().includes("spotify");
+    // El reproductor de Spotify, buscado en la LISTA y no cogiendo el "activo".
+    // `MprisController.activePlayer` sigue a lo ultimo que sono: al darle a un
+    // video de YouTube el activo pasa a ser Firefox, y al pausarlo se queda
+    // ahi. Spotify podia seguir sonando y el del centro no volvia nunca.
+    readonly property MprisPlayer spotify: {
+        const ps = MprisController.players ?? [];
+        for (let i = 0; i < ps.length; i++) {
+            const p = ps[i];
+            if (`${p?.dbusName ?? ""} ${p?.identity ?? ""}`.toLowerCase().includes("spotify"))
+                return p;
+        }
+        return null;
     }
 
-    // Fondo de la barra, igual que en el BarContent de end-4. Se había quitado
-    // cuando esto era solo islas sobre el fondo de pantalla; vuelve porque el
-    // diseño de referencia lleva banda. Sigue colgando de `showBackground` y de
-    // `cornerStyle`, así que no se le roba el control a los ajustes.
-    Loader { // Sombra del fondo
-        active: Config.options.bar.showBackground && Config.options.bar.cornerStyle === 1 && Config.options.bar.floatStyleShadow
-        anchors.fill: barBackground
-        sourceComponent: StyledRectangularShadow {
-            anchors.fill: undefined // El Loader ancla por él; no debe anclarse solo
-            target: barBackground
-        }
-    }
-    Rectangle {
-        id: barBackground
-        anchors {
-            fill: parent
-            margins: Config.options.bar.cornerStyle === 1 ? (Appearance.sizes.hyprlandGapsOut) : 0
-        }
-        color: Config.options.bar.showBackground ? ColorUtils.applyAlpha(Appearance.colors.colLayer0, 1) : "transparent"
-        radius: Config.options.bar.cornerStyle === 1 ? Appearance.rounding.windowRounding : 0
-        border.width: Config.options.bar.cornerStyle === 1 ? 1 : 0
-        border.color: Appearance.colors.colLayer0Border
-    }
+    // Spotify sonando AHORA. De esto cuelgan dos cosas a la vez: aparece el
+    // reproductor en el centro y se esconde la ventana enfocada si ademas es
+    // Spotify. Va en UNA sola propiedad a proposito: si cada uno lo dedujera
+    // por su cuenta podrian discrepar un instante.
+    readonly property bool sonandoSpotify: root.spotify?.playbackState === MprisPlaybackState.Playing
 
     FocusedScrollMouseArea { // Left side | scroll to change brightness
         id: barLeftSideMouseArea
@@ -232,12 +213,17 @@ Item { // Bar content region
             // En la referencia el icono y las dos líneas van sueltos sobre la
             // banda, sin fondo propio. TituloDeslizante ya trae el icono y las
             // dos líneas; aquí sólo se le da sitio.
-            // Se esconde con Spotify sonando: el titulo de ventana de Spotify
-            // ES la cancion, asi que se veria dos veces. Y al irse deja libre
-            // justo el hueco que necesita el reproductor del centro.
+            // Se esconde SOLO cuando sobra de verdad: con Spotify sonando Y
+            // ademas siendo la ventana enfocada. En ese caso su titulo de
+            // ventana ES la cancion, asi que se veria dos veces, y al irse deja
+            // libre justo el hueco del reproductor central.
+            //
+            // Antes bastaba con que Spotify sonara, y eso escondia el titulo
+            // aunque estuvieras en otra ventana: perdias saber donde estabas a
+            // cambio de nada.
             TituloDeslizante {
                 id: ventanaActiva
-                visible: !root.sonandoSpotify
+                visible: !(root.sonandoSpotify && ventanaActiva.claseApp.toLowerCase().includes("spotify"))
                 Layout.alignment: Qt.AlignVCenter
                 Layout.leftMargin: 12
                 Layout.fillWidth: true
@@ -298,6 +284,9 @@ Item { // Bar content region
             }
 
             MediaIsland {
+                // Clavado a Spotify: si no, con YouTube sonando el centro
+                // ensenaria el video mientras la condicion habla de Spotify.
+                reproductorFijo: root.spotify
                 Layout.fillWidth: true
             }
         }

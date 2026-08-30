@@ -12,7 +12,15 @@ import Quickshell.Hyprland
 Item {
     id: root
     property bool borderless: Config.options.bar.borderless
-    readonly property MprisPlayer activePlayer: MprisController.activePlayer
+    // CUARTO cambio sobre end-4: se puede fijar QUE reproductor se muestra.
+    // Por defecto sigue siendo el activo, que es lo que hacia siempre; la barra
+    // lo usa para clavar el del centro a Spotify.
+    //
+    // Hace falta porque `activePlayer` sigue a lo ULTIMO que sono: al darle a
+    // un video de YouTube el activo pasa a ser Firefox, y al pausarlo se queda
+    // ahi. Spotify podia seguir sonando y el reproductor del centro no volvia.
+    property MprisPlayer reproductorFijo: null
+    readonly property MprisPlayer activePlayer: reproductorFijo ?? MprisController.activePlayer
     // TERCER cambio sobre end-4. Antes esto era el titulo del reproductor
     // activo a secas, sin mirar si estaba sonando, asi que al parar la barra se
     // quedaba clavada con lo ultimo. Caso real que lo destapo -dos

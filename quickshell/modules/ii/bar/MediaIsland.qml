@@ -16,6 +16,10 @@ import QtQuick
 MouseArea {
     id: root
 
+    // Deja fijar el reproductor desde fuera; sin esto la barra no puede pedir
+    // "ensename Spotify" y se queda con el que MprisController tenga por activo.
+    property alias reproductorFijo: media.reproductorFijo
+
     implicitWidth: media.implicitWidth
     implicitHeight: media.implicitHeight
 
