@@ -78,6 +78,7 @@ gst-plugins-bad
 gst-plugins-ugly
 gtk-session-lock
 hdparm
+headsetcontrol
 hwdetect
 hwinfo
 hyprcursor
@@ -164,6 +165,7 @@ papirus-icon-theme
 paru
 pcaudiolib
 perl
+piper-tts-bin
 pipewire
 pipewire-alsa
 pipewire-audio

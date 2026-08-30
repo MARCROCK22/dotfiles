@@ -13,7 +13,7 @@ Este repo contiene **solo lo que va encima de end-4**, no end-4 entero.
 | `quickshell/` | Archivos **enteros** del shell de end-4, con sus hashes en `MANIFEST`. No son enlaces de stow: los copia `install.py` |
 | `patches/` | Legado de la v14, cuando esto eran diffs. Ya no lo usa nada — se puede borrar |
 | `alacritty/` | Terminal |
-| `bin/` | Scripts propios (`recorder`: grabación de pantalla; `reparar-pantallas`: recupera el DisplayPort cuando despierta sin EDID) |
+| `bin/` | Scripts propios: `recorder` (grabación de pantalla), `reparar-pantallas` (recupera el DisplayPort cuando despierta sin EDID) y `casco-bateria` (dice la carga del G733 al pulsar su botón) |
 | `fish/` | Shell |
 | `fastfetch/` | Resumen del sistema al abrir la terminal |
 | `starship/` | Prompt |

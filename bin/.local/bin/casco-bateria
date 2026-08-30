@@ -1,0 +1,243 @@
+#!/usr/bin/env python3
+"""Dice en voz alta la bateria del casco al pulsar su boton de encendido.
+
+Replica lo que hace G HUB en Windows, que no existe para Linux. La voz NO sale
+del casco: el firmware no sabe hablar. En Windows tampoco — es G HUB quien
+reproduce el audio, y aqui hacemos lo mismo.
+
+Como se descubrio el disparador (20260830): el boton de encendido NO llega por
+la via normal de entrada. El casco solo declara seis teclas (silenciar, subir y
+bajar volumen, siguiente, pausa, anterior) y el de encendido no esta entre
+ellas. Pero si manda un informe por la interfaz HID cruda, que es por donde
+habla G HUB. Capturando /dev/hidraw* mientras se pulsaba salio, tres pulsaciones
+y tres informes identicos:
+
+    11 ff 05 00 02 00 00 ...
+
+La pulsacion CORTA es la que manda eso y no tiene ningun otro efecto; mantenerlo
+apretado apaga el casco y no llega a mandar nada. Por eso se puede usar libre.
+
+El mismo canal escupe tambien el voltaje por su cuenta (`11 ff 08 00 <mV>`), que
+se ignora aqui: para el porcentaje ya esta headsetcontrol, que ademas dice si
+esta cargando.
+
+Uso:
+    casco-bateria            demonio: escucha el boton
+    casco-bateria --decir    lo dice una vez y sale (para un atajo de teclado)
+"""
+import fcntl
+import json
+import os
+import select
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+
+# El informe del boton. Se comparan solo estos bytes: el resto del informe va a
+# cero y compararlo entero solo lo haria fragil si el firmware cambia el relleno.
+BOTON = bytes([0x11, 0xFF, 0x05, 0x00, 0x02])
+
+# Dos pulsaciones mas juntas que esto son un rebote o un doble toque sin querer.
+ANTIRREBOTE_S = 1.5
+
+# Cada cuanto se vuelve a buscar el casco cuando no esta (apagado o desenchufado).
+REINTENTO_S = 5
+
+
+def hidraw_del_casco():
+    """Ruta del /dev/hidraw* del casco, o None.
+
+    Se busca por NOMBRE y no por numero: el numero se lo asigna el kernel por
+    orden de conexion y cambia entre arranques. Se excluye el "Battery Charger",
+    que es un segundo dispositivo USB del mismo casco y no manda los botones.
+    """
+    base = "/sys/class/hidraw"
+    if not os.path.isdir(base):
+        return None
+    for entrada in sorted(os.listdir(base)):
+        uevent = os.path.join(base, entrada, "device", "uevent")
+        try:
+            with open(uevent) as f:
+                datos = f.read()
+        except OSError:
+            continue
+        for linea in datos.splitlines():
+            if linea.startswith("HID_NAME="):
+                nombre = linea.split("=", 1)[1]
+                if "G733" in nombre and "Charger" not in nombre:
+                    return os.path.join("/dev", entrada)
+    return None
+
+
+def bateria():
+    """(estado, porcentaje) segun headsetcontrol, o (None, None)."""
+    try:
+        salida = subprocess.run(
+            ["headsetcontrol", "-o", "json"],
+            capture_output=True, text=True, timeout=10,
+        ).stdout
+        d = json.loads(salida)["devices"][0]["battery"]
+        return d.get("status"), d.get("level")
+    except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError):
+        return None, None
+
+
+def frase():
+    estado, nivel = bateria()
+    if estado == "BATTERY_CHARGING":
+        return "Cargando. Batería al %d por ciento." % nivel
+    if estado == "BATTERY_AVAILABLE" and nivel is not None:
+        return "Batería al %d por ciento." % nivel
+    return "No puedo leer la batería del casco."
+
+
+def sink_del_casco():
+    """Nombre del destino de audio del casco, para no anunciar por el monitor
+    si el usuario ha cambiado la salida por defecto."""
+    try:
+        salida = subprocess.run(
+            ["pactl", "list", "sinks", "short"],
+            capture_output=True, text=True, timeout=5,
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for linea in salida.splitlines():
+        campos = linea.split("\t")
+        if len(campos) > 1 and "G733" in campos[1]:
+            return campos[1]
+    return None
+
+
+# Voz neuronal de piper. NO va en el repo a proposito: son 61 MB de pesos
+# binarios que nunca se editan, y un repo de configuracion no es sitio para eso.
+# Si falta, se baja con:
+#   mkdir -p ~/.local/share/piper-voices && cd ~/.local/share/piper-voices
+#   B=https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_MX/claude/high
+#   curl -LO $B/es_MX-claude-high.onnx -O $B/es_MX-claude-high.onnx.json
+#
+# Es es_MX y no es_ES por el locale de la maquina. El motor es `piper-tts` (de
+# piper-tts-bin en AUR) y no `piper` a secas: ese nombre ya lo ocupa la
+# aplicacion GTK de configurar ratones, que no tiene nada que ver.
+VOZ = os.path.expanduser("~/.local/share/piper-voices/es_MX-claude-high.onnx")
+
+
+def sintetizar(texto, destino):
+    """Escribe el wav. Prefiere piper; cae a espeak-ng, que suena a robot pero
+    siempre esta. True si ha salido algo audible."""
+    if shutil.which("piper-tts") and os.path.exists(VOZ):
+        try:
+            subprocess.run(
+                ["piper-tts", "--model", VOZ, "--output_file", destino],
+                input=texto, text=True, capture_output=True, timeout=30,
+            )
+            if os.path.getsize(destino) > 0:
+                return True
+        except (OSError, subprocess.SubprocessError):
+            pass
+        # Si piper falla se sigue a espeak: mejor voz fea que silencio.
+    if shutil.which("espeak-ng"):
+        try:
+            subprocess.run(
+                ["espeak-ng", "-v", "es-la", "-s", "150", "-w", destino, texto],
+                check=False, timeout=15,
+            )
+            return os.path.getsize(destino) > 0
+        except (OSError, subprocess.SubprocessError):
+            pass
+    return False
+
+
+def decir(texto):
+    """Sintetiza a un wav y lo manda AL CASCO.
+
+    El wav intermedio no es un rodeo: los dos sintetizadores escriben al destino
+    de audio por defecto, y el del sistema no siempre es el casco.
+    """
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        ruta = tmp.name
+    try:
+        if not sintetizar(texto, ruta):
+            print("no hay ningun sintetizador disponible", file=sys.stderr)
+            return
+        sink = sink_del_casco()
+        orden = ["paplay"] + (["--device", sink] if sink else []) + [ruta]
+        subprocess.run(orden, check=False, timeout=20)
+    finally:
+        try:
+            os.unlink(ruta)
+        except OSError:
+            pass
+
+
+def escuchar():
+    ultimo = 0.0
+    while True:
+        ruta = hidraw_del_casco()
+        if ruta is None:
+            time.sleep(REINTENTO_S)
+            continue
+        try:
+            fd = os.open(ruta, os.O_RDONLY | os.O_NONBLOCK)
+        except OSError:
+            # Sin permiso normalmente significa que falta la regla udev de
+            # headsetcontrol (/usr/lib/udev/rules.d/70-headsets.rules).
+            time.sleep(REINTENTO_S)
+            continue
+        try:
+            while True:
+                listos, _, _ = select.select([fd], [], [], 1.0)
+                if not listos:
+                    # Sin datos no se sabe si el casco sigue ahi: se comprueba.
+                    if hidraw_del_casco() != ruta:
+                        break
+                    continue
+                try:
+                    datos = os.read(fd, 64)
+                except (BlockingIOError, InterruptedError):
+                    continue
+                except OSError:
+                    break          # el casco se ha ido
+                if not datos:
+                    break
+                if datos[:len(BOTON)] == BOTON:
+                    ahora = time.time()
+                    if ahora - ultimo >= ANTIRREBOTE_S:
+                        ultimo = ahora
+                        decir(frase())
+        finally:
+            os.close(fd)
+
+
+def unica_instancia():
+    """Cerrojo para que solo haya un demonio.
+
+    Sin esto, tenerlo arrancado por la sesion y lanzarlo ademas a mano hace que
+    cada pulsacion se anuncie DOS veces, solapadas. El cerrojo lo suelta el
+    kernel al morir el proceso, asi que no hay nada que limpiar ni queda basura
+    si el demonio se va de malas maneras.
+
+    El descriptor se guarda en un global a proposito: si se recolecta, se
+    suelta el cerrojo y la proteccion desaparece sin avisar.
+    """
+    global _cerrojo
+    ruta = os.path.join(
+        os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "casco-bateria.lock")
+    _cerrojo = open(ruta, "w")
+    try:
+        fcntl.flock(_cerrojo, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return False
+    return True
+
+
+_cerrojo = None
+
+if __name__ == "__main__":
+    if "--decir" in sys.argv:
+        decir(frase())          # disparo unico: no compite con el demonio
+    elif unica_instancia():
+        escuchar()
+    else:
+        print("ya hay otro casco-bateria escuchando", file=sys.stderr)
