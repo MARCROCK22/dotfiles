@@ -95,6 +95,30 @@ Item { // Bar content region
     // por su cuenta podrian discrepar un instante.
     readonly property bool sonandoSpotify: root.spotify?.playbackState === MprisPlaybackState.Playing
 
+    // Fondo de la barra, igual que en el BarContent de end-4. Se había quitado
+    // cuando esto era solo islas sobre el fondo de pantalla; vuelve porque el
+    // diseño de referencia lleva banda. Sigue colgando de `showBackground` y de
+    // `cornerStyle`, así que no se le roba el control a los ajustes.
+    Loader { // Sombra del fondo
+        active: Config.options.bar.showBackground && Config.options.bar.cornerStyle === 1 && Config.options.bar.floatStyleShadow
+        anchors.fill: barBackground
+        sourceComponent: StyledRectangularShadow {
+            anchors.fill: undefined // El Loader ancla por él; no debe anclarse solo
+            target: barBackground
+        }
+    }
+    Rectangle {
+        id: barBackground
+        anchors {
+            fill: parent
+            margins: Config.options.bar.cornerStyle === 1 ? (Appearance.sizes.hyprlandGapsOut) : 0
+        }
+        color: Config.options.bar.showBackground ? ColorUtils.applyAlpha(Appearance.colors.colLayer0, 1) : "transparent"
+        radius: Config.options.bar.cornerStyle === 1 ? Appearance.rounding.windowRounding : 0
+        border.width: Config.options.bar.cornerStyle === 1 ? 1 : 0
+        border.color: Appearance.colors.colLayer0Border
+    }
+
     FocusedScrollMouseArea { // Left side | scroll to change brightness
         id: barLeftSideMouseArea
 
