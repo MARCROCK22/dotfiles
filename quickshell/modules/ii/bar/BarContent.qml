@@ -33,8 +33,9 @@ import qs.modules.common.functions
  * El de multimedia además se puede TOCAR: controles, búsqueda y
  * volumen. Los espacios de trabajo se quedan sin popup a propósito.
  *
- * La franja de la ventana enfocada (ActiveWindow) se conserva aunque no
- * estuviera en la lista: quitarla sería perder algo que ya tenías.
+ * La franja de la ventana enfocada se RETIRÓ el 20260830, a petición. Con ella
+ * fuera, `TituloDeslizante.qml` se quedó sin usuarios y también salió del repo;
+ * sigue en el historial de git por si vuelve.
  */
 Item { // Bar content region
     id: root
@@ -162,15 +163,15 @@ Item { // Bar content region
                 //
                 // El suelo son los anillos: pueden quedarse sin texto de
                 // canción al lado, pero no desaparecer.
-                // El maximo es el CONTENIDO, no el hueco disponible. Con el
+                // El maximo es el CONTENIDO, no el hueco disponible: con el
                 // hueco, un titulo corto dejaba la isla estirada y el texto
-                // flotando centrado en medio de un vacio (Media lo centra), que
-                // es como se veia con «WhatsApp» de titulo.
+                // flotando centrado en medio del vacio, porque Media lo centra.
+                // Asi crece hasta lo que tiene que enseniar y para.
                 //
-                // Asi la isla crece hasta lo que tiene que enseniar y para. La
-                // del titulo ya estaba topada igual, con lo cual las dos son
-                // simetricas: crecen con su contenido y, cuando entre las dos
-                // no caben, `fillWidth` reparte el deficit.
+                // `fillWidth` se queda aunque ya no compita con nadie: es lo
+                // que hace que, si el titulo de la cancion no cabe en la mitad
+                // izquierda, la isla encoja de forma ordenada hasta el suelo
+                // -los anillos- en vez de desbordarse.
                 Layout.fillWidth: true
                 Layout.minimumWidth: anillos.implicitWidth + root.islaPadding * 2
                 Layout.maximumWidth: anillos.implicitWidth + (reproductor.visible ? reproductor.implicitWidth + 4 : 0) + root.islaPadding * 2
@@ -187,41 +188,8 @@ Item { // Bar content region
                 }
             }
 
-            // ── isla del título de la ventana enfocada ──────────────────
-            // El tope tiene que salir del CONTENIDO, no ser un número fijo.
-            // Con `maximumWidth: 460` a pelo la isla no sabía cuánto hueco
-            // quedaba hasta la isla central y se le metía encima (medido: con
-            // un título de 96 caracteres la franja iba de x=424 a x=1146 sin
-            // separación, y la central lo tapaba por ir declarada después).
-            //
-            // `fillWidth: true` + máximo atado al ancho natural del contenido
-            // da exactamente lo que se quiere: ancho = min(hueco, contenido).
-            // Título corto -> se ciñe al texto, sin píldora medio vacía.
-            // Título largo -> lo limita el hueco y el texto se DESLIZA dentro
-            // (TituloDeslizante recorta y anima), en vez de cortarse.
-            // `minimumWidth: 0` es lo que le permite encoger de verdad.
-            IslandGroup {
-                id: islaTitulo
-                outlined: root.islaContorno
-                tint: root.islaTinte
-                corner: root.islaRadio
-                verticalInset: root.islaInset
-                padding: root.islaPadding
-                Layout.alignment: Qt.AlignVCenter
-                Layout.leftMargin: 10
-                Layout.fillWidth: true
-                Layout.minimumWidth: 0
-                Layout.maximumWidth: ventanaActiva.implicitWidth + root.islaPadding * 2
-                visible: root.useShortenedForm === 0
-
-                TituloDeslizante {
-                    id: ventanaActiva
-                    Layout.fillWidth: true
-                }
-            }
-
-            // Empuja la isla del título contra la de recursos en vez de dejarla
-            // centrada en el hueco.
+            // Empuja las islas contra el borde izquierdo en vez de dejarlas
+            // centradas en el hueco.
             Item {
                 Layout.fillWidth: true
             }
