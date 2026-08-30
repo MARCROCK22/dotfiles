@@ -143,17 +143,27 @@ Item { // Bar content region
                 // esquina redondeada de la pantalla. Mismo valor que usa
                 // RippleButton en el extremo contrario, así queda simétrico.
                 Layout.leftMargin: leftSidebarButton.visible ? 0 : Appearance.rounding.screenRounding
-                // Tope estructural, no un número inventado: esta isla no puede
-                // ser más ancha que la sección izquierda entera, que ya está
-                // anclada a `middleSection.left`.  Sin esto, un título de
-                // canción largo la hacía crecer sin freno y cruzaba la barra
-                // por debajo de workspaces, clima y reloj (comprobado con uno
-                // de 130 caracteres).  Media tiene `fillWidth` y `elide`, así
-                // que al toparse es su texto el que se recorta, no los anillos.
-                Layout.minimumWidth: 0
-                Layout.maximumWidth: barLeftSideMouseArea.width
+                // El tope ya no es "la mitad izquierda entera": eso dejaba a
+                // la isla del título en 40 px, solo el icono y ni una letra
+                // (medido con «Escapism (feat. AJ Michalka, Zach Callison &
+                // Grace Rolek)»).  El motivo es que ESTA isla no lleva
+                // `fillWidth`, así que Qt le concede su ancho natural completo
+                // —que crece con el título de la canción— y la del título, que
+                // sí lo lleva, se queda con lo que sobre.
+                //
+                // Ahora el tope sale de la estructura: lo que quede tras darle
+                // al título de la ventana su ancho natural.  Y el suelo son los
+                // anillos, que no pueden desaparecer nunca; lo que cede es el
+                // TEXTO de Media, que ya trae `fillWidth` y `elide`.
+                //
+                // Reparto que produce: título corto -> el reproductor se lleva
+                // casi todo.  Título largo -> el reproductor baja hasta los
+                // anillos.  Canción larga -> se recorta ella, que es lo pedido.
+                Layout.minimumWidth: anillos.implicitWidth + root.islaPadding * 2
+                Layout.maximumWidth: Math.max(anillos.implicitWidth + root.islaPadding * 2, barLeftSideMouseArea.width - islaTitulo.Layout.maximumWidth - 10)
 
                 StatsIsland {
+                    id: anillos
                     Layout.fillWidth: root.useShortenedForm === 2
                 }
 
@@ -177,6 +187,7 @@ Item { // Bar content region
             // (TituloDeslizante recorta y anima), en vez de cortarse.
             // `minimumWidth: 0` es lo que le permite encoger de verdad.
             IslandGroup {
+                id: islaTitulo
                 outlined: root.islaContorno
                 tint: root.islaTinte
                 corner: root.islaRadio

@@ -74,7 +74,19 @@ Item {
 
         StyledText {
             visible: Config.options.bar.verbose
-            width: rowLayout.width - (CircularProgress.size + rowLayout.spacing * 2)
+            // SEGUNDO cambio sobre end-4, y es un fallo suyo: aqui habia un
+            // `width:` explicito dentro de un Layout, que pelea con el propio
+            // Layout, y encima restaba `CircularProgress.size`, una referencia
+            // ESTATICA a un tipo que no resuelve. La resta daba NaN, el ancho
+            // quedaba invalido y `elide` no tenia contra que recortar: con la
+            // isla apretada el texto se desbordaba y se dibujaba ENCIMA de los
+            // anillos de RAM/GPU/CPU en vez de truncarse.
+            //
+            // No se veia porque hasta ahora la isla siempre recibia su ancho
+            // natural completo; solo aparece al ponerle un tope.
+            //
+            // Se quita el `width:` y manda `Layout.fillWidth`, que es lo que
+            // debia mandar desde el principio.
             Layout.alignment: Qt.AlignVCenter
             Layout.fillWidth: true // Ensures the text takes up available space
             Layout.rightMargin: rowLayout.spacing
