@@ -326,15 +326,16 @@ Item { // Bar content region
                 spacing: 12
                 layoutDirection: Qt.LeftToRight
 
-                // Revealer ya se dimensiona solo a partir de su hijo
-                // (`childrenRect`), asi que NO se le pone implicitWidth ni
-                // fillHeight: con fillHeight se estiraba a los 45 px de la
-                // barra y el icono, que mide 20 y no lleva anclaje, se quedaba
-                // pegado ARRIBA en vez de centrado.
-                Revealer {
-                    reveal: Notifications.silent || Notifications.unread > 0
+                // Siempre visible, sin Revealer que lo esconda: en la guía la
+                // campana está fija y lo que aparece y desaparece es SU
+                // contador, que ya lo gestiona NotificationUnreadCount por su
+                // cuenta (`visible: !silent && unread > 0` en su burbuja).
+                //
+                // Antes iba dentro de un Revealer que lo revelaba solo con
+                // notificaciones pendientes, así que el hueco de la barra
+                // cambiaba de ancho al llegar cualquier aviso.
+                NotificationUnreadCount {
                     Layout.alignment: Qt.AlignVCenter
-                    NotificationUnreadCount {}
                 }
 
                 NetworkIsland {
