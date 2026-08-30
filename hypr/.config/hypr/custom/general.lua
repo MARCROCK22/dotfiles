@@ -48,11 +48,31 @@ hl.animation({
   style = "slidevert"
 })
 
--- Segunda distribución de teclado: RETIRADA el 2026-08-16 --------------------
--- Estuvo aquí como `kb_layout = "us,es"` para que apareciera el
--- KeyboardLayoutButton de la barra. Provocó un bloqueo: el greeter de SDDM usa
--- siempre `us` (/etc/vconsole.conf), así que con `es` activo la contraseña
--- entraba en el login y la rechazaban la pantalla de bloqueo y sudo, que sí
--- corren dentro de la sesión. Y sin `kb_options` de grupo, el botón de la barra
--- era la ÚNICA forma de volver a `us`, inalcanzable desde el lock.
--- Si se reintroduce: añadir también un atajo de teclado para rotar.
+-- Segunda distribución de teclado ---------------------------------------------
+-- Estuvo puesta como `us,es` y se RETIRÓ el 2026-08-16 porque dejaba fuera: el
+-- greeter de SDDM usa siempre `us` (/etc/vconsole.conf), así que con la otra
+-- activa la contraseña la rechazaban la pantalla de bloqueo y sudo, que sí
+-- corren dentro de la sesión. Sin forma de rotar desde el lock, el botón de la
+-- barra era la única salida, y hasta ahí no se llega.
+--
+-- Vuelve el 2026-08-29, con esa salida puesta. `grp:win_space_toggle` es una
+-- opción de XKB, NO un `hl.bind`, y la diferencia es justo el fallo anterior:
+-- la rotación la resuelve el estado XKB del compositor antes de que la tecla
+-- llegue a ningún cliente, así que sigue funcionando con hyprlock delante, que
+-- captura el teclado y se comería un bind normal.
+--
+-- `us` va PRIMERA a propósito: es la que queda activa al arrancar la sesión, y
+-- así coincide con lo que teclea el greeter.
+--
+-- `latam` y no `es` por el locale de la máquina (es_MX / es_DO). Entre las dos
+-- cambian de sitio varios símbolos, no solo el nombre.
+--
+-- Si alguna vez vuelve a liarse, esto fuerza `us` sin depender del teclado ni
+-- de la barra (vale desde una TTY con Ctrl+Alt+F2):
+--     hyprctl switchxkblayout all 0
+hl.config({
+  input = {
+    kb_layout = "us,latam",
+    kb_options = "grp:win_space_toggle",
+  },
+})
