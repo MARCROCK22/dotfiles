@@ -81,7 +81,7 @@ El ciclo completo tras cada actualización está en **[MANTENIMIENTO.md](MANTENI
 
 | Archivo (`reemplazo`) | Por qué está modificado |
 |---|---|
-| `bar/BarContent.qml` | Diseño propio: banda sólida de borde a borde con los grupos como islas sin contorno. Recursos a la izquierda, workspaces centrados, reloj a la derecha |
+| `bar/BarContent.qml` | Diseño propio sobre banda sólida de borde a borde, copiado de una referencia. Izquierda: píldora del reloj, puntos de workspace sueltos, botón de overview y ventana enfocada sin píldora. Centro vacío. Derecha sin islas: recursos, bandeja e indicadores separados por barras `/` |
 | `common/Config.qml` | Añade al esquema los ajustes de los widgets propios (`alertLine`, `dgpu`, `pulse`, `quickControls`, `media.showArtist`…). Solo suma, no quita nada de end-4 |
 | `bar/Media.qml` | Tres cambios. **Cero**: con nada sonando pone «Nada reproduciendo» en vez de quedarse clavado en lo último. **Uno**: el artista detrás del título pasa a colgar de `bar.media.showArtist`. **Dos**, y es un bug de end-4: el texto tenía un `width:` explícito dentro de un Layout que restaba `CircularProgress.size`, una referencia estática que no resuelve; daba NaN y `elide` no recortaba, así que al apretar la isla el texto se dibujaba encima de los anillos |
 | `bar/StyledPopup.qml` | **Bug de end-4**: `margins.left` no se acota a la pantalla, los popups se recortan cerca de un borde |

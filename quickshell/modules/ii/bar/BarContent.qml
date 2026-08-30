@@ -24,10 +24,19 @@ import qs.modules.common.functions
  * Hyprland y esquinas redondeadas, que es un rectángulo flotante con borde, y
  * la referencia llega hasta x=0 sin margen.
  *
- * Reparto pedido:
- *   izquierda  RAM / GPU / swap en anillos + multimedia
- *   centro     espacios de trabajo + clima
- *   derecha    hora con día, utilidades, teclado, batería, red y sesión
+ * Reparto, copiado del diseño de referencia (20260830):
+ *   izquierda  píldora con la hora · píldora con los puntos de workspace y el
+ *              botón de la barra lateral · ventana enfocada SIN píldora
+ *   centro     vacío
+ *   derecha    píldora de recursos · bandeja · píldora de avisos, red,
+ *              bluetooth y volumen · píldora de batería y sesión
+ *
+ * Lo que la referencia NO tiene y por tanto se fue: el reproductor, el clima,
+ * la fecha del reloj, el teclado y las utilidades. Está todo en la rama
+ * `respaldo-barra-20260830-0124` si hay que recuperarlo.
+ *
+ * Su píldora de tokens de Claude es un widget del fork de nao que aquí no
+ * existe; en su sitio van los anillos de recursos, a petición.
  *
  * Todo lo que no sean los espacios de trabajo tiene detalle al pasar el ratón.
  * El de multimedia además se puede TOCAR: controles, búsqueda y
@@ -123,101 +132,33 @@ Item { // Bar content region
             anchors.fill: parent
             spacing: 0
 
-            LeftSidebarButton {
-                id: leftSidebarButton
-                Layout.alignment: Qt.AlignVCenter
-                Layout.leftMargin: Appearance.rounding.screenRounding
-                colBackground: barLeftSideMouseArea.hovered ? Appearance.colors.colLayer1Hover : ColorUtils.transparentize(Appearance.colors.colLayer1Hover, 1)
-            }
-
-            // ── isla izquierda: recursos + multimedia ────────────────────
+            // ── píldora del reloj ───────────────────────────────────────
+            // Sólo la hora, sin fecha: es lo que enseña el diseño de
+            // referencia, y así le deja el ancho al título de la ventana.
             IslandGroup {
-                id: leftIsland
                 outlined: root.islaContorno
                 tint: root.islaTinte
                 corner: root.islaRadio
                 verticalInset: root.islaInset
                 padding: root.islaPadding
                 Layout.alignment: Qt.AlignVCenter
-                // Con LeftSidebarButton oculto esta isla queda la primera de la
-                // fila: sin este margen su contorno se dibuja fuera de la
-                // esquina redondeada de la pantalla. Mismo valor que usa
-                // RippleButton en el extremo contrario, así queda simétrico.
-                Layout.leftMargin: leftSidebarButton.visible ? 0 : Appearance.rounding.screenRounding
-                // Las dos islas de ancho variable —esta y la del título—
-                // COMPARTEN el hueco, y por eso las dos llevan `fillWidth`.
-                //
-                // Que esto faltara es toda la historia de los dos fallos que
-                // hubo aquí. Sin `fillWidth`, Qt le concede a UNA su ancho
-                // natural completo y la otra se queda con las sobras. Primero
-                // le tocó al título, que bajó a 40 px, solo el icono. Al
-                // arreglarlo dándole prioridad al título, le tocó al
-                // reproductor, que desapareció entero con Spotify enfocado
-                // —su título de ventana es la canción, larguísimo—.
-                //
-                // Dar prioridad a una isla deja a la otra vacía en algún caso,
-                // siempre. Con las dos en `fillWidth` y cada una topada a su
-                // ancho natural, Qt reparte el déficit entre ambas: ceden los
-                // TEXTOS a la vez, que para eso llevan recorte y deslizamiento,
-                // y ninguna isla se queda en blanco.
-                //
-                // El suelo son los anillos: pueden quedarse sin texto de
-                // canción al lado, pero no desaparecer.
-                // El maximo es el CONTENIDO, no el hueco disponible: con el
-                // hueco, un titulo corto dejaba la isla estirada y el texto
-                // flotando centrado en medio del vacio, porque Media lo centra.
-                // Asi crece hasta lo que tiene que enseniar y para.
-                //
-                // `fillWidth` se queda aunque ya no compita con nadie: es lo
-                // que hace que, si el titulo de la cancion no cabe en la mitad
-                // izquierda, la isla encoja de forma ordenada hasta el suelo
-                // -los anillos- en vez de desbordarse.
-                Layout.fillWidth: true
-                Layout.minimumWidth: anillos.implicitWidth + root.islaPadding * 2
-                Layout.maximumWidth: anillos.implicitWidth + (reproductor.visible ? reproductor.implicitWidth + 4 : 0) + root.islaPadding * 2
+                // Esta isla abre la fila, así que hereda el margen de la
+                // esquina redondeada de pantalla que llevaba LeftSidebarButton.
+                Layout.leftMargin: Appearance.rounding.screenRounding
 
-                StatsIsland {
-                    id: anillos
-                    Layout.fillWidth: root.useShortenedForm === 2
-                }
-
-                MediaIsland {
-                    id: reproductor
-                    visible: root.useShortenedForm < 2
-                    Layout.fillWidth: true
+                ClockWidget {
+                    showDate: false
+                    Layout.alignment: Qt.AlignVCenter
                 }
             }
 
-            // Empuja las islas contra el borde izquierdo en vez de dejarlas
-            // centradas en el hueco.
-            Item {
-                Layout.fillWidth: true
-            }
-        }
-    }
-
-    // ── isla central: espacios de trabajo + clima ────────────────────────
-    Row {
-        id: middleSection
-        anchors {
-            top: parent.top
-            bottom: parent.bottom
-            horizontalCenter: parent.horizontalCenter
-        }
-        spacing: 6
-
-        IslandGroup {
-            id: middleIsland
-            anchors.verticalCenter: parent.verticalCenter
-            padding: root.islaPadding
-            outlined: root.islaContorno
-            tint: root.islaTinte
-            corner: root.islaRadio
-            verticalInset: root.islaInset
-
+            // ── espacios de trabajo, SIN píldora ────────────────────────
+            // En la guía los puntos van sueltos sobre la banda, sin fondo
+            // propio: sólo el reloj lleva píldora en todo el lado izquierdo.
             Workspaces {
                 id: workspacesWidget
                 Layout.fillHeight: true
+                Layout.leftMargin: 14
                 MouseArea {
                     // Right-click to toggle overview
                     anchors.fill: parent
@@ -231,13 +172,77 @@ Item { // Bar content region
                 }
             }
 
-            Loader {
-                active: Config.options.bar.weather.enable
+            // ── botón del overview ──────────────────────────────────────
+            // El círculo con el icono de capas que hay en la guía. No se usa
+            // LeftSidebarButton: ése abre la barra lateral y además sólo se ve
+            // si tienes activados el chat de IA, el traductor o lo de anime,
+            // así que en esta máquina no se veía nunca.
+            Item {
                 Layout.alignment: Qt.AlignVCenter
-                Layout.leftMargin: active ? 6 : 0
-                sourceComponent: WeatherBar {}
+                Layout.leftMargin: 14
+                implicitWidth: 26
+                implicitHeight: 26
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: width / 2
+                    color: botonOverview.containsMouse ? Appearance.colors.colLayer1Hover : "transparent"
+                    border.width: 1
+                    border.color: Appearance.colors.colOutlineVariant
+                }
+
+                MaterialSymbol {
+                    anchors.centerIn: parent
+                    text: "layers"
+                    iconSize: 15
+                    fill: GlobalStates.overviewOpen ? 1 : 0
+                    color: Appearance.colors.colOnLayer0
+                }
+
+                MouseArea {
+                    id: botonOverview
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onPressed: GlobalStates.overviewOpen = !GlobalStates.overviewOpen
+                }
+            }
+
+            // ── ventana enfocada, SIN píldora ───────────────────────────
+            // En la referencia el icono y las dos líneas van sueltos sobre la
+            // banda, sin fondo propio. TituloDeslizante ya trae el icono y las
+            // dos líneas; aquí sólo se le da sitio.
+            TituloDeslizante {
+                id: ventanaActiva
+                Layout.alignment: Qt.AlignVCenter
+                Layout.leftMargin: 12
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                Layout.maximumWidth: ventanaActiva.implicitWidth
+            }
+
+            // Empuja las islas contra el borde izquierdo en vez de dejarlas
+            // centradas en el hueco.
+            Item {
+                Layout.fillWidth: true
             }
         }
+    }
+
+    // Divisoria estructural, no un contenedor. De sus bordes cuelgan los
+    // anclajes de las dos mitades (`barLeftSideMouseArea.right` y
+    // `barRightSideMouseArea.left`), así que no se puede borrar aunque el
+    // centro quede vacío: con ancho cero es lo que parte la barra por la mitad.
+    //
+    // Va vacío porque los espacios de trabajo se han ido a la izquierda,
+    // siguiendo el diseño de referencia.
+    Item {
+        id: middleSection
+        anchors {
+            top: parent.top
+            bottom: parent.bottom
+            horizontalCenter: parent.horizontalCenter
+        }
+        implicitWidth: 0
     }
 
     FocusedScrollMouseArea { // Right side | scroll to change volume
@@ -278,173 +283,113 @@ Item { // Bar content region
 
             // Primero en RightToLeft = pegado al borde derecho, y por eso es
             // este el que lleva el margen de la esquina de pantalla.
-            // ── isla del botón de la barra lateral ──────────────────────
-            // Lleva los avisos de silencio, micro y notificaciones, y el
-            // bluetooth. Antes flotaba suelto al borde: ahora es una isla más.
-            IslandGroup {
-                outlined: root.islaContorno
-                tint: root.islaTinte
-                corner: root.islaRadio
-                verticalInset: root.islaInset
-                padding: root.islaPadding
+            // ── lado derecho: SIN islas, separado por barras ────────────
+            // La guía no lleva píldoras aquí: los iconos van sueltos sobre la
+            // banda y los grupos se separan con una barra fina. Por eso este
+            // lado no usa IslandGroup, al revés que el reloj de la izquierda.
+            //
+            // Orden en RightToLeft: lo PRIMERO declarado queda pegado al borde
+            // derecho, así que se lee de derecha a izquierda.
+
+            PowerButton {
                 Layout.alignment: Qt.AlignVCenter
                 Layout.rightMargin: Appearance.rounding.screenRounding
-                RippleButton { // Right sidebar button
-                    id: rightSidebarButton
-
-                    Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-                    Layout.fillWidth: false
-
-                    implicitWidth: indicatorsRowLayout.implicitWidth + 10 * 2
-                    implicitHeight: indicatorsRowLayout.implicitHeight + 5 * 2
-
-                    buttonRadius: Appearance.rounding.full
-                    colBackground: barRightSideMouseArea.hovered ? Appearance.colors.colLayer1Hover : ColorUtils.transparentize(Appearance.colors.colLayer1Hover, 1)
-                    colBackgroundHover: Appearance.colors.colLayer1Hover
-                    colRipple: Appearance.colors.colLayer1Active
-                    colBackgroundToggled: Appearance.colors.colSecondaryContainer
-                    colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
-                    colRippleToggled: Appearance.colors.colSecondaryContainerActive
-                    toggled: GlobalStates.sidebarRightOpen
-                    property color colText: toggled ? Appearance.m3colors.m3onSecondaryContainer : Appearance.colors.colOnLayer0
-
-                    Behavior on colText {
-                        animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
-                    }
-
-                    onPressed: {
-                        GlobalStates.sidebarRightOpen = !GlobalStates.sidebarRightOpen;
-                    }
-
-                    RowLayout {
-                        id: indicatorsRowLayout
-                        anchors.centerIn: parent
-                        property real realSpacing: 15
-                        spacing: 0
-
-                        Revealer {
-                            reveal: Audio.sink?.audio?.muted ?? false
-                            Layout.fillHeight: true
-                            Layout.rightMargin: reveal ? indicatorsRowLayout.realSpacing : 0
-                            Behavior on Layout.rightMargin {
-                                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
-                            }
-                            MaterialSymbol {
-                                text: "volume_off"
-                                iconSize: Appearance.font.pixelSize.larger
-                                color: rightSidebarButton.colText
-                            }
-                        }
-                        Revealer {
-                            reveal: Audio.source?.audio?.muted ?? false
-                            Layout.fillHeight: true
-                            Layout.rightMargin: reveal ? indicatorsRowLayout.realSpacing : 0
-                            Behavior on Layout.rightMargin {
-                                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
-                            }
-                            MaterialSymbol {
-                                text: "mic_off"
-                                iconSize: Appearance.font.pixelSize.larger
-                                color: rightSidebarButton.colText
-                            }
-                        }
-                        Revealer {
-                            reveal: Notifications.silent || Notifications.unread > 0
-                            Layout.fillHeight: true
-                            implicitHeight: reveal ? notificationUnreadCount.implicitHeight : 0
-                            implicitWidth: reveal ? notificationUnreadCount.implicitWidth : 0
-                            // Cada revelador aporta SU propia separación por la
-                            // derecha. Este la había perdido en una edición mía y
-                            // se quedó un `Behavior` sobre una propiedad que ya
-                            // no se asignaba: código muerto, y sin hueco cuando
-                            // el aviso aparece.
-                            Layout.rightMargin: reveal ? indicatorsRowLayout.realSpacing : 0
-                            Behavior on Layout.rightMargin {
-                                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
-                            }
-                            NotificationUnreadCount {
-                                id: notificationUnreadCount
-                            }
-                        }
-                        // El icono de red sale de aquí a propósito: ahora vive en la
-                        // isla de la derecha con su propio detalle al hover, y
-                        // tenerlo dos veces sería ruido.
-                        MaterialSymbol {
-                            // SIN margen izquierdo. En end-4 lo llevaba para
-                            // separarse del icono de red que iba justo antes;
-                            // al mover la red a la isla derecha, el bluetooth
-                            // quedó el primero y esos 15 px pasaron a ser hueco
-                            // por delante. Como la fila va centrada en el botón,
-                            // el icono salía descuadrado a la derecha.
-                            // La separación, cuando hace falta, la ponen los
-                            // reveladores con su `rightMargin`.
-                            visible: BluetoothStatus.available
-                            text: BluetoothStatus.connected ? "bluetooth_connected" : BluetoothStatus.enabled ? "bluetooth" : "bluetooth_disabled"
-                            iconSize: Appearance.font.pixelSize.larger
-                            color: rightSidebarButton.colText
-                        }
-                    }
-                }
+                Layout.leftMargin: 10
             }
 
-            // ── isla derecha: hora, utilidades, teclado, red, batería, sesión
-            IslandGroup {
-                id: rightIsland
-                outlined: root.islaContorno
-                tint: root.islaTinte
-                corner: root.islaRadio
-                verticalInset: root.islaInset
-                padding: root.islaPadding
+            Separador {}
+
+            // La batería y su separador desaparecen juntos: este equipo es un
+            // sobremesa y `Battery.available` es false, y un separador suelto
+            // sin nada al lado sería una raya en el aire.
+            BatteryIndicator {
+                visible: root.useShortenedForm < 2 && Battery.available
                 Layout.alignment: Qt.AlignVCenter
+                Layout.leftMargin: 10
+                Layout.rightMargin: 10
+            }
 
-                ClockWidget {
-                    showDate: (Config.options.bar.verbose && root.useShortenedForm < 2)
-                    Layout.alignment: Qt.AlignVCenter
-                }
+            Separador {
+                visible: root.useShortenedForm < 2 && Battery.available
+            }
 
-                UtilButtons {
-                    visible: (Config.options.bar.verbose && root.useShortenedForm === 0)
-                    Layout.alignment: Qt.AlignVCenter
-                }
+            // ── avisos, red, bluetooth y volumen ────────────────────────
+            RowLayout {
+                Layout.alignment: Qt.AlignVCenter
+                Layout.leftMargin: 10
+                Layout.rightMargin: 10
+                spacing: 12
+                layoutDirection: Qt.LeftToRight
 
-                KeyboardLayoutButton {
-                    Layout.alignment: Qt.AlignVCenter
+                Revealer {
+                    reveal: Notifications.silent || Notifications.unread > 0
+                    Layout.fillHeight: true
+                    implicitWidth: reveal ? notificationUnreadCount.implicitWidth : 0
+                    NotificationUnreadCount {
+                        id: notificationUnreadCount
+                    }
                 }
 
                 NetworkIsland {
                     Layout.alignment: Qt.AlignVCenter
                 }
 
-                BatteryIndicator {
-                    visible: (root.useShortenedForm < 2 && Battery.available)
-                    Layout.alignment: Qt.AlignVCenter
+                MaterialSymbol {
+                    visible: BluetoothStatus.available
+                    text: BluetoothStatus.connected ? "bluetooth_connected" : BluetoothStatus.enabled ? "bluetooth" : "bluetooth_disabled"
+                    iconSize: Appearance.font.pixelSize.larger
+                    color: Appearance.colors.colOnLayer0
                 }
 
-                PowerButton {
+                MaterialSymbol {
+                    text: (Audio.sink?.audio?.muted ?? false) ? "volume_off" : "volume_up"
+                    iconSize: Appearance.font.pixelSize.larger
+                    color: Appearance.colors.colOnLayer0
+                }
+
+                // El micro va en circulo relleno cuando esta silenciado, que es
+                // como lo marca la guia: ahi es el unico icono con fondo.
+                Item {
+                    implicitWidth: 24
+                    implicitHeight: 24
                     Layout.alignment: Qt.AlignVCenter
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: width / 2
+                        visible: Audio.source?.audio?.muted ?? false
+                        color: Appearance.colors.colOnLayer0
+                    }
+
+                    MaterialSymbol {
+                        anchors.centerIn: parent
+                        text: (Audio.source?.audio?.muted ?? false) ? "mic_off" : "mic"
+                        iconSize: Appearance.font.pixelSize.larger
+                        color: (Audio.source?.audio?.muted ?? false) ? Appearance.colors.colLayer0 : Appearance.colors.colOnLayer0
+                    }
                 }
             }
 
-            // La bandeja como isla propia: no la pediste, pero quitarla sería
-            // perder los iconos de las aplicaciones que ya tienes ahí.
-            IslandGroup {
-                // Vacía si no hay iconos: sin esto quedaría una píldora hueca
-                // flotando. `implicitWidth` del propio SysTray es la señal, y
-                // no hace falta importar el servicio para leerla.
-                visible: root.useShortenedForm === 0 && bandeja.implicitWidth > 0
-                outlined: root.islaContorno
-                tint: root.islaTinte
-                corner: root.islaRadio
-                verticalInset: root.islaInset
-                padding: root.islaPadding
-                Layout.alignment: Qt.AlignVCenter
+            Separador {}
 
-                SysTray {
-                    id: bandeja
-                    visible: root.useShortenedForm === 0
-                    Layout.fillHeight: true
-                    invertSide: Config?.options.bar.bottom
-                }
+            // ── bandeja del sistema ─────────────────────────────────────
+            SysTray {
+                id: bandeja
+                visible: root.useShortenedForm === 0 && bandeja.implicitWidth > 0
+                Layout.alignment: Qt.AlignVCenter
+                Layout.leftMargin: 12
+                Layout.rightMargin: 12
+                Layout.fillHeight: true
+                invertSide: Config?.options.bar.bottom
+            }
+
+            // ── recursos ────────────────────────────────────────────────
+            // En la guía este sitio lo ocupa el gasto de tokens de Claude, que
+            // es un widget del fork de nao y aquí no existe. Sustituido a
+            // petición por el uso de recursos de la máquina.
+            StatsIsland {
+                Layout.alignment: Qt.AlignVCenter
+                Layout.leftMargin: 8
             }
 
             Item {
@@ -452,5 +397,27 @@ Item { // Bar content region
                 Layout.fillHeight: true
             }
         }
+    }
+
+    // `NotificationUnreadCount` de end-4 tiene el color cableado a
+    // `rightSidebarButton.colText`, un id de la estructura que tenía la barra
+    // antes. Ese botón ya no existe, y el componente resuelve los ids por el
+    // contexto del fichero que lo instancia, así que basta con ofrecerle aquí
+    // lo que busca. Se hace así en vez de adoptar NotificationUnreadCount.qml
+    // como un reemplazo más: serían seis archivos de end-4 que revisar en cada
+    // actualización, por cambiar una línea de color.
+    QtObject {
+        id: rightSidebarButton
+        readonly property color colText: Appearance.colors.colOnLayer0
+    }
+
+    // La barra fina que separa grupos en el lado derecho. Es el mismo glifo de
+    // la guía, no una línea dibujada: así hereda tamaño y color del tema sin
+    // tener que cuadrar alturas a mano.
+    component Separador: StyledText {
+        Layout.alignment: Qt.AlignVCenter
+        text: "/"
+        color: Appearance.colors.colOnLayer1Inactive
+        font.pixelSize: Appearance.font.pixelSize.larger
     }
 }
