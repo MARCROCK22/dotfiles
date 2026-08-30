@@ -6,6 +6,7 @@ import qs.modules.common.functions
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 import Quickshell.Services.Mpris
 import Quickshell.Hyprland
 
@@ -19,6 +20,23 @@ Item {
     // Hace falta porque `activePlayer` sigue a lo ULTIMO que sono: al darle a
     // un video de YouTube el activo pasa a ser Firefox, y al pausarlo se queda
     // ahi. Spotify podia seguir sonando y el reproductor del centro no volvia.
+    // Ruta del icono de la aplicacion que suena, o "" si no se resuelve.
+    //
+    // Se busca por ENTRADA .DESKTOP y no adivinando por el nombre, porque con
+    // Spotify adivinar no funciona: el icono no se llama «spotify» sino
+    // «spotify-launcher», y esa correspondencia solo la conoce el .desktop
+    // (`StartupWMClass=spotify` -> `Icon=spotify-launcher`). El reproductor
+    // publica `DesktopEntry = "spotify"`, que es justo la pista que hace falta.
+    //
+    // `guessIcon` queda de ultimo recurso para reproductores sin .desktop.
+    readonly property string rutaIcono: {
+        const p = activePlayer;
+        if (!p)
+            return "";
+        const e = DesktopEntries.heuristicLookup(p.desktopEntry ?? "") ?? DesktopEntries.heuristicLookup(p.identity ?? "");
+        return Quickshell.iconPath(e?.icon ?? AppSearch.guessIcon(p.identity ?? ""), "");
+    }
+
     property MprisPlayer reproductorFijo: null
     readonly property MprisPlayer activePlayer: reproductorFijo ?? MprisController.activePlayer
     // TERCER cambio sobre end-4. Antes esto era el titulo del reproductor
@@ -72,27 +90,50 @@ Item {
         spacing: 4
         anchors.fill: parent
 
-        ClippedFilledCircularProgress {
-            id: mediaCircProg
+        // QUINTO cambio sobre end-4: el icono de la APLICACION -Spotify- en
+        // vez del glifo generico de pausa. El anillo de progreso se queda:
+        // sigue marcando por donde va la cancion, que el icono no dice.
+        //
+        // El icono va FUERA del ClippedFilledCircularProgress y superpuesto,
+        // no dentro. Dentro no se veia: ese componente recorta su contenido con
+        // una mascara, y eso mata a un Kirigami.Icon aunque el glifo de texto
+        // que habia antes si sobreviviera. Se perdio un rato buscandolo en el
+        // tamano y en la ruta, que estaban bien -el diagnostico daba
+        // `image://icon/spotify-launcher`, correcto-.
+        Item {
             Layout.alignment: Qt.AlignVCenter
-            lineWidth: Appearance.rounding.unsharpen
-            value: activePlayer?.position / activePlayer?.length
-            implicitSize: 20
-            colPrimary: Appearance.colors.colOnSecondaryContainer
-            enableAnimation: false
+            implicitWidth: 20
+            implicitHeight: 20
 
-            Item {
+            ClippedFilledCircularProgress {
+                id: mediaCircProg
+                anchors.fill: parent
+                lineWidth: Appearance.rounding.unsharpen
+                value: activePlayer?.position / activePlayer?.length
+                implicitSize: 20
+                colPrimary: Appearance.colors.colOnSecondaryContainer
+                enableAnimation: false
+            }
+
+            AppIcon {
+                id: iconoApp
                 anchors.centerIn: parent
-                width: mediaCircProg.implicitSize
-                height: mediaCircProg.implicitSize
-                
-                MaterialSymbol {
-                    anchors.centerIn: parent
-                    fill: 1
-                    text: activePlayer?.isPlaying ? "pause" : "music_note"
-                    iconSize: Appearance.font.pixelSize.normal
-                    color: Appearance.m3colors.m3onSecondaryContainer
-                }
+                // Se mira si la RUTA resolvio, no el `status`: AppIcon es un
+                // Kirigami.Icon, no un Image, asi que comparar contra
+                // Image.Ready dejaba el anillo sin icono Y sin reserva.
+                visible: root.rutaIcono !== ""
+                implicitSize: 13
+                source: root.rutaIcono
+            }
+
+            // Reserva para reproductores sin entrada .desktop que resolver.
+            MaterialSymbol {
+                anchors.centerIn: parent
+                visible: !iconoApp.visible
+                fill: 1
+                text: activePlayer?.isPlaying ? "pause" : "music_note"
+                iconSize: Appearance.font.pixelSize.normal
+                color: Appearance.m3colors.m3onSecondaryContainer
             }
         }
 
