@@ -34,6 +34,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import wave
 
 # El informe del boton. Se comparan solo estos bytes: el resto del informe va a
 # cero y compararlo entero solo lo haria fragil si el firmware cambia el relleno.
@@ -44,29 +45,6 @@ ANTIRREBOTE_S = 1.5
 
 # Cada cuanto se vuelve a buscar el casco cuando no esta (apagado o desenchufado).
 REINTENTO_S = 5
-
-# Avisos de empezar y dejar de cargar. El tema de sonidos de freedesktop trae
-# justo estos dos, hechos para esto: no hace falta fabricar nada.
-SONIDOS = "/usr/share/sounds/freedesktop/stereo"
-SONIDO_ENCHUFA = os.path.join(SONIDOS, "power-plug.oga")
-SONIDO_DESENCHUFA = os.path.join(SONIDOS, "power-unplug.oga")
-
-# Cada cuanto se pregunta si esta cargando. A 37 ms por consulta medidos, 2 s
-# es un 1,8% de un nucleo: se nota en la respuesta y no en la maquina.
-CARGA_CADA_S = 2
-
-# Diario de a bordo. Vive en XDG_RUNTIME_DIR, o sea en RAM y se borra al
-# reiniciar: sirve para mirar por que no ha sonado algo, no para acumular.
-DIARIO = os.path.join(
-    os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "casco-bateria.log")
-
-
-def anotar(texto):
-    try:
-        with open(DIARIO, "a") as f:
-            f.write("%s  %s\n" % (time.strftime("%H:%M:%S"), texto))
-    except OSError:
-        pass
 
 
 def hidraw_del_casco():
@@ -145,6 +123,31 @@ def sink_del_casco():
 # aplicacion GTK de configurar ratones, que no tiene nada que ver.
 VOZ = os.path.expanduser("~/.local/share/piper-voices/es_MX-claude-high.onnx")
 
+# El casco duerme su salida de audio cuando lleva un rato en silencio (PipeWire
+# la deja SUSPENDED) y tarda cerca de un segundo en despertar. Sin este relleno
+# se perdia el principio del anuncio y se oia "...ria al 87" en vez de
+# "Bateria al 87".
+#
+# Va delante del audio en vez de desactivar la suspension del dispositivo:
+# apagarla mantendria la radio y el conversor del casco despiertos siempre, y
+# esto es un casco INALAMBRICO a bateria. Asi solo se paga al hablar.
+SILENCIO_S = 1.0
+
+
+def poner_silencio(wav, segundos=SILENCIO_S):
+    """Antepone silencio a un WAV, en su sitio."""
+    try:
+        with wave.open(wav, "rb") as w:
+            params = w.getparams()
+            datos = w.readframes(w.getnframes())
+        mudos = int(params.framerate * segundos)
+        relleno = b"\x00" * (mudos * params.nchannels * params.sampwidth)
+        with wave.open(wav, "wb") as w:
+            w.setparams(params)
+            w.writeframes(relleno + datos)
+    except (OSError, wave.Error):
+        pass          # sin silencio se oye recortado, pero se oye
+
 
 def sintetizar(texto, destino):
     """Escribe el wav. Prefiere piper; cae a espeak-ng, que suena a robot pero
@@ -184,6 +187,7 @@ def decir(texto):
         if not sintetizar(texto, ruta):
             print("no hay ningun sintetizador disponible", file=sys.stderr)
             return
+        poner_silencio(ruta)
         sink = sink_del_casco()
         orden = ["paplay"] + (["--device", sink] if sink else []) + [ruta]
         subprocess.run(orden, check=False, timeout=20)
@@ -194,69 +198,9 @@ def decir(texto):
             pass
 
 
-def sonar(ruta):
-    """Un sonido corto, por el casco."""
-    if not os.path.exists(ruta):
-        anotar("SONAR falla: no existe %s" % ruta)
-        return
-    sink = sink_del_casco()
-    orden = ["paplay"] + (["--device", sink] if sink else []) + [ruta]
-    try:
-        r = subprocess.run(orden, capture_output=True, text=True, timeout=15)
-        anotar("SONAR %s -> rc=%d sink=%s %s" % (
-            os.path.basename(ruta), r.returncode, sink or "(por defecto)",
-            (r.stderr or "").strip()[:120]))
-    except (OSError, subprocess.SubprocessError) as e:
-        anotar("SONAR excepcion: %r" % (e,))
-
-
-def cargando_ahora():
-    """True cargando, False con bateria, None si no se sabe.
-
-    Se le pregunta a headsetcontrol. El primer intento fue mirar si estaba el
-    USB del cargador (046d:0b20), que es 100 veces mas barato -0,3 ms contra
-    31 ms medidos-, pero NO es fiable: el 20260830 la bateria subio de 86% a
-    89%, o sea que cargo de verdad, sin que ese dispositivo llegara a aparecer.
-    Un atajo que se pierde la mitad de las cargas no es un atajo.
-    """
-    estado, _ = bateria()
-    if estado == "BATTERY_CHARGING":
-        return True
-    if estado == "BATTERY_AVAILABLE":
-        return False
-    return None
-
-
-def revisar_carga(anterior, consultado):
-    """Suena si acaba de empezar o de dejar de cargar.
-
-    Devuelve (estado, momento de la consulta). Se llama cada segundo pero solo
-    pregunta cada CARGA_CADA_S, que es lo unico que cuesta.
-
-    Dos casos que a proposito NO suenan: `anterior` a None, que es el arranque
-    del demonio -si no, sonaria en cada inicio de sesion-, y un estado nuevo a
-    None, que significa casco apagado o fuera de alcance. Eso no es "ha dejado
-    de cargar", es "no se sabe", y anunciarlo seria mentir.
-    """
-    ahora = time.time()
-    if ahora - consultado < CARGA_CADA_S:
-        return anterior, consultado
-    estado = cargando_ahora()
-    if estado != anterior:
-        anotar("estado %r -> %r" % (anterior, estado))
-    if estado is None:
-        return anterior, ahora
-    if anterior is not None and estado != anterior:
-        sonar(SONIDO_ENCHUFA if estado else SONIDO_DESENCHUFA)
-    return estado, ahora
-
-
 def escuchar():
     ultimo = 0.0
-    cargando, consultado = None, 0.0
     while True:
-        # Tambien aqui: el cable se puede enchufar con el casco apagado.
-        cargando, consultado = revisar_carga(cargando, consultado)
         ruta = hidraw_del_casco()
         if ruta is None:
             time.sleep(REINTENTO_S)
@@ -272,8 +216,6 @@ def escuchar():
             while True:
                 listos, _, _ = select.select([fd], [], [], 1.0)
                 if not listos:
-                    # Este despertar de cada segundo ya existia; se aprovecha.
-                    cargando, consultado = revisar_carga(cargando, consultado)
                     # Sin datos no se sabe si el casco sigue ahi: se comprueba.
                     if hidraw_del_casco() != ruta:
                         break
