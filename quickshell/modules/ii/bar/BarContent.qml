@@ -143,24 +143,28 @@ Item { // Bar content region
                 // esquina redondeada de la pantalla. Mismo valor que usa
                 // RippleButton en el extremo contrario, así queda simétrico.
                 Layout.leftMargin: leftSidebarButton.visible ? 0 : Appearance.rounding.screenRounding
-                // El tope ya no es "la mitad izquierda entera": eso dejaba a
-                // la isla del título en 40 px, solo el icono y ni una letra
-                // (medido con «Escapism (feat. AJ Michalka, Zach Callison &
-                // Grace Rolek)»).  El motivo es que ESTA isla no lleva
-                // `fillWidth`, así que Qt le concede su ancho natural completo
-                // —que crece con el título de la canción— y la del título, que
-                // sí lo lleva, se queda con lo que sobre.
+                // Las dos islas de ancho variable —esta y la del título—
+                // COMPARTEN el hueco, y por eso las dos llevan `fillWidth`.
                 //
-                // Ahora el tope sale de la estructura: lo que quede tras darle
-                // al título de la ventana su ancho natural.  Y el suelo son los
-                // anillos, que no pueden desaparecer nunca; lo que cede es el
-                // TEXTO de Media, que ya trae `fillWidth` y `elide`.
+                // Que esto faltara es toda la historia de los dos fallos que
+                // hubo aquí. Sin `fillWidth`, Qt le concede a UNA su ancho
+                // natural completo y la otra se queda con las sobras. Primero
+                // le tocó al título, que bajó a 40 px, solo el icono. Al
+                // arreglarlo dándole prioridad al título, le tocó al
+                // reproductor, que desapareció entero con Spotify enfocado
+                // —su título de ventana es la canción, larguísimo—.
                 //
-                // Reparto que produce: título corto -> el reproductor se lleva
-                // casi todo.  Título largo -> el reproductor baja hasta los
-                // anillos.  Canción larga -> se recorta ella, que es lo pedido.
+                // Dar prioridad a una isla deja a la otra vacía en algún caso,
+                // siempre. Con las dos en `fillWidth` y cada una topada a su
+                // ancho natural, Qt reparte el déficit entre ambas: ceden los
+                // TEXTOS a la vez, que para eso llevan recorte y deslizamiento,
+                // y ninguna isla se queda en blanco.
+                //
+                // El suelo son los anillos: pueden quedarse sin texto de
+                // canción al lado, pero no desaparecer.
+                Layout.fillWidth: true
                 Layout.minimumWidth: anillos.implicitWidth + root.islaPadding * 2
-                Layout.maximumWidth: Math.max(anillos.implicitWidth + root.islaPadding * 2, barLeftSideMouseArea.width - islaTitulo.Layout.maximumWidth - 10)
+                Layout.maximumWidth: barLeftSideMouseArea.width
 
                 StatsIsland {
                     id: anillos
