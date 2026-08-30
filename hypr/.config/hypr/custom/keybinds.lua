@@ -96,3 +96,16 @@ hl.unbind("SUPER + B")
 -- Libres para lo que quieras, por ejemplo:
 --   hl.bind("SUPER + A", hl.dsp.exec_cmd("..."), { description = "App: ..." })
 -- fin -- sidebar-plan-b --------------------------------------------------
+
+-- Captura de región al estilo ShareX ------------------------------------------
+-- El mismo capturador que ya tenía end-4 en SUPER+SHIFT+S; esto solo añade un
+-- segundo atajo, no lo mueve.
+--
+-- OJO CON EL CHOQUE: en kitty y alacritty `Ctrl+Shift+C` es COPIAR, y un bind
+-- global de Hyprland gana sobre la aplicación. Con esto puesto, dejas de poder
+-- copiar con el teclado en la terminal; hay que usar el ratón o cambiar el
+-- atajo de copia en kitty.conf. Se pone así a petición, sabiendo el precio.
+--
+-- Para quitarlo: borrar estas líneas y `hyprctl reload`.
+hl.bind("CTRL + SHIFT + C", hl.dsp.global("quickshell:regionScreenshot"),
+    { description = "Utilities: Screen snip (estilo ShareX)" })
