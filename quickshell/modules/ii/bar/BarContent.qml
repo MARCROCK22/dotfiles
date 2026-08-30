@@ -29,8 +29,8 @@ import qs.modules.common.functions
  *   izquierda  píldora con la hora · workspaces · botón de overview
  *   centro     el reproductor de Spotify si suena, y si no la ventana enfocada:
  *              los dos comparten hueco y se turnan
- *   derecha    píldora de recursos · bandeja · píldora de avisos, red,
- *              bluetooth y volumen · píldora de batería y sesión
+ *   derecha    recursos · bandeja · avisos, teclado, red, bluetooth, volumen
+ *              y micro · batería · sesión, todo separado por barras
  *
  * Lo que la referencia NO tiene y por tanto se fue: el reproductor, el clima,
  * la fecha del reloj, el teclado y las utilidades. Está todo en la rama
@@ -390,6 +390,14 @@ Item { // Bar content region
                 // notificaciones pendientes, así que el hueco de la barra
                 // cambiaba de ancho al llegar cualquier aviso.
                 NotificationUnreadCount {
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
+                // Distribucion del teclado, al lado de las notificaciones.
+                // Solo se ve con MAS DE UNA distribucion configurada; con una
+                // sola no tendria nada que alternar y se esconde el solo. Aqui
+                // hay us y latam, asi que sale.
+                KeyboardLayoutButton {
                     Layout.alignment: Qt.AlignVCenter
                 }
 
