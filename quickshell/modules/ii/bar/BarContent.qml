@@ -2,6 +2,7 @@ import qs.modules.ii.bar.weather
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Services.Mpris
 import Quickshell.Services.UPower
 import qs
 import qs.services
@@ -73,6 +74,21 @@ Item { // Bar content region
     // quedaba a 4 px del borde y chocaba con la curva. 12 despeja la curva por
     // los dos extremos (medido: la curva se come ~4 px a la altura del texto).
     readonly property int islaPadding: 12
+
+    // Spotify sonando AHORA. De esto cuelgan dos cosas a la vez: aparece el
+    // reproductor en el centro y se esconde la ventana enfocada de la
+    // izquierda. Va en UNA sola propiedad a proposito: si cada uno lo dedujera
+    // por su cuenta podrian discrepar un instante y verse las dos, o ninguna.
+    //
+    // Se mira el nombre de dbus y la identidad: `org.mpris.MediaPlayer2.spotify`
+    // es lo que publica, pero el cliente puede cambiar y la identidad («Spotify»)
+    // sirve de red.
+    readonly property bool sonandoSpotify: {
+        const p = MprisController.activePlayer;
+        if (!p || p.playbackState !== MprisPlaybackState.Playing)
+            return false;
+        return `${p.dbusName ?? ""} ${p.identity ?? ""}`.toLowerCase().includes("spotify");
+    }
 
     // Fondo de la barra, igual que en el BarContent de end-4. Se había quitado
     // cuando esto era solo islas sobre el fondo de pantalla; vuelve porque el
@@ -216,8 +232,12 @@ Item { // Bar content region
             // En la referencia el icono y las dos líneas van sueltos sobre la
             // banda, sin fondo propio. TituloDeslizante ya trae el icono y las
             // dos líneas; aquí sólo se le da sitio.
+            // Se esconde con Spotify sonando: el titulo de ventana de Spotify
+            // ES la cancion, asi que se veria dos veces. Y al irse deja libre
+            // justo el hueco que necesita el reproductor del centro.
             TituloDeslizante {
                 id: ventanaActiva
+                visible: !root.sonandoSpotify
                 Layout.alignment: Qt.AlignVCenter
                 Layout.leftMargin: 12
                 Layout.fillWidth: true
@@ -247,7 +267,40 @@ Item { // Bar content region
             bottom: parent.bottom
             horizontalCenter: parent.horizontalCenter
         }
-        implicitWidth: 0
+
+        // Tope FIJO en proporción a la barra, y NO calculado a partir del ancho
+        // vivo de los lados. Atarlo a los lados fue el primer intento y se veía
+        // fatal: los números de los anillos cambian a cada lectura -«5» ocupa
+        // menos que «45»-, así que la píldora del centro se redimensionaba
+        // constantemente y la barra parecía respirar.
+        //
+        // Un tercio es de sobra y deja MÁS espacio del que necesitan los lados:
+        // en 1920 son 653 px para el centro y 633 por lado, cuando la izquierda
+        // fija ocupa ~412 y la derecha ~570. Y aunque algún día no llegara, no
+        // habría solape: las dos mitades están ancladas a los bordes de ESTE
+        // item, así que lo que sobra o falta se lo reparten ellas, y su
+        // contenido variable -el título de la canción, el de la ventana- ya
+        // recorta o desliza dentro de lo que le toque.
+        implicitWidth: !root.sonandoSpotify ? 0 : Math.min(islaMedia.implicitWidth, root.width * 0.34)
+
+        IslandGroup {
+            id: islaMedia
+            visible: root.sonandoSpotify
+            outlined: root.islaContorno
+            tint: root.islaTinte
+            corner: root.islaRadio
+            verticalInset: root.islaInset
+            padding: root.islaPadding
+            anchors {
+                verticalCenter: parent.verticalCenter
+                left: parent.left
+                right: parent.right
+            }
+
+            MediaIsland {
+                Layout.fillWidth: true
+            }
+        }
     }
 
     FocusedScrollMouseArea { // Right side | scroll to change volume
