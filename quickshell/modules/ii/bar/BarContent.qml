@@ -153,8 +153,13 @@ Item { // Bar content region
             }
 
             // ── espacios de trabajo, SIN píldora ────────────────────────
-            // En la guía los puntos van sueltos sobre la banda, sin fondo
-            // propio: sólo el reloj lleva píldora en todo el lado izquierdo.
+            // Van sueltos sobre la banda, sin fondo propio: sólo el reloj lleva
+            // píldora en todo el lado izquierdo.
+            //
+            // Con NÚMEROS y no con los puntos de la guía, a petición: es la
+            // única cosa del diseño de referencia que se deja de lado. Sale de
+            // `alwaysShowNumbers` y `showAppIcons` en config.json, así que
+            // Workspaces.qml se queda como lo trae end-4, sin adoptar.
             Workspaces {
                 id: workspacesWidget
                 Layout.fillHeight: true
