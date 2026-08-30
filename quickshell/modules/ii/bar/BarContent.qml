@@ -26,9 +26,9 @@ import qs.modules.common.functions
  * la referencia llega hasta x=0 sin margen.
  *
  * Reparto, copiado del diseño de referencia (20260830):
- *   izquierda  píldora con la hora · píldora con los puntos de workspace y el
- *              botón de la barra lateral · ventana enfocada SIN píldora
- *   centro     vacío
+ *   izquierda  píldora con la hora · workspaces · botón de overview
+ *   centro     el reproductor de Spotify si suena, y si no la ventana enfocada:
+ *              los dos comparten hueco y se turnan
  *   derecha    píldora de recursos · bandeja · píldora de avisos, red,
  *              bluetooth y volumen · píldora de batería y sesión
  *
@@ -233,28 +233,6 @@ Item { // Bar content region
                 }
             }
 
-            // ── ventana enfocada, SIN píldora ───────────────────────────
-            // En la referencia el icono y las dos líneas van sueltos sobre la
-            // banda, sin fondo propio. TituloDeslizante ya trae el icono y las
-            // dos líneas; aquí sólo se le da sitio.
-            // Se esconde SOLO cuando sobra de verdad: con Spotify sonando Y
-            // ademas siendo la ventana enfocada. En ese caso su titulo de
-            // ventana ES la cancion, asi que se veria dos veces, y al irse deja
-            // libre justo el hueco del reproductor central.
-            //
-            // Antes bastaba con que Spotify sonara, y eso escondia el titulo
-            // aunque estuvieras en otra ventana: perdias saber donde estabas a
-            // cambio de nada.
-            TituloDeslizante {
-                id: ventanaActiva
-                visible: !(root.sonandoSpotify && ventanaActiva.claseApp.toLowerCase().includes("spotify"))
-                Layout.alignment: Qt.AlignVCenter
-                Layout.leftMargin: 12
-                Layout.fillWidth: true
-                Layout.minimumWidth: 0
-                Layout.maximumWidth: ventanaActiva.implicitWidth
-            }
-
             // Empuja las islas contra el borde izquierdo en vez de dejarlas
             // centradas en el hueco.
             Item {
@@ -278,40 +256,51 @@ Item { // Bar content region
             horizontalCenter: parent.horizontalCenter
         }
 
-        // Tope FIJO en proporción a la barra, y NO calculado a partir del ancho
-        // vivo de los lados. Atarlo a los lados fue el primer intento y se veía
-        // fatal: los números de los anillos cambian a cada lectura -«5» ocupa
-        // menos que «45»-, así que la píldora del centro se redimensionaba
-        // constantemente y la barra parecía respirar.
+        // ── hueco compartido: reproductor O ventana enfocada ────────────
+        // Los dos ocupan el MISMO sitio y se turnan: si Spotify suena sale el
+        // reproductor, y si no la ventana enfocada. Asi la barra no cambia de
+        // forma segun lo que este sonando.
         //
-        // Un tercio es de sobra y deja MÁS espacio del que necesitan los lados:
-        // en 1920 son 653 px para el centro y 633 por lado, cuando la izquierda
-        // fija ocupa ~412 y la derecha ~570. Y aunque algún día no llegara, no
-        // habría solape: las dos mitades están ancladas a los bordes de ESTE
-        // item, así que lo que sobra o falta se lo reparten ellas, y su
-        // contenido variable -el título de la canción, el de la ventana- ya
-        // recorta o desliza dentro de lo que le toque.
-        implicitWidth: !root.sonandoSpotify ? 0 : Math.min(islaMedia.implicitWidth, root.width * 0.34)
+        // Las dos condiciones son la misma propiedad negada, no dos
+        // comprobaciones parecidas: es lo unico que garantiza que no se vean
+        // las dos a la vez ni ninguna.
+        //
+        // El tope es un tercio del ancho de la barra, FIJO y sin depender del
+        // ancho vivo de los lados. Atarlo a los lados fue un intento anterior y
+        // se veia fatal: los numeros de los anillos cambian a cada lectura, asi
+        // que esto se redimensionaba constantemente y la barra parecia respirar.
+        //
+        // Y con el tope no puede pisar nada, pase lo que pase con el titulo:
+        // las dos mitades estan ancladas a los bordes de ESTE item, asi que lo
+        // que ocupa aqui se lo restan ellas, nunca al reves. Si el contenido no
+        // cabe, se queda con el tope y el texto recorta o desliza dentro.
+        implicitWidth: Math.min(contenidoCentral.implicitWidth, root.width * 0.34)
 
-        IslandGroup {
-            id: islaMedia
-            visible: root.sonandoSpotify
-            outlined: root.islaContorno
-            tint: root.islaTinte
-            corner: root.islaRadio
-            verticalInset: root.islaInset
-            padding: root.islaPadding
+        Item {
+            id: contenidoCentral
             anchors {
                 verticalCenter: parent.verticalCenter
                 left: parent.left
                 right: parent.right
             }
+            // El ancho natural es el del que TOQUE ensenar, para que el tope de
+            // arriba mida contra lo correcto y no contra el que esta oculto.
+            implicitWidth: root.sonandoSpotify ? reproductor.implicitWidth : ventanaActiva.implicitWidth
+            implicitHeight: Appearance.sizes.baseBarHeight
 
             MediaIsland {
-                // Clavado a Spotify: si no, con YouTube sonando el centro
-                // ensenaria el video mientras la condicion habla de Spotify.
+                id: reproductor
+                // Clavado a Spotify y no al reproductor "activo": ese sigue a
+                // lo ultimo que sono, y un video de YouTube se lo llevaba.
                 reproductorFijo: root.spotify
-                Layout.fillWidth: true
+                visible: root.sonandoSpotify
+                anchors.fill: parent
+            }
+
+            TituloDeslizante {
+                id: ventanaActiva
+                visible: !root.sonandoSpotify
+                anchors.fill: parent
             }
         }
     }
