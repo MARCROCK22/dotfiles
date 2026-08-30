@@ -76,21 +76,3 @@ hl.config({
     kb_options = "grp:win_space_toggle",
   },
 })
-
--- Ratón sin aceleración --------------------------------------------------------
--- `flat` es relación 1:1 constante: la misma distancia de ratón mueve siempre el
--- mismo número de píxeles, vaya rápido o despacio.
---
--- Antes no había NADA configurado -accel_profile vacío, force_no_accel en false,
--- sensitivity en 0-, y con eso manda el defecto de libinput, que es `adaptive`,
--- o sea CON aceleración. Comprobado con `libinput list-devices`, que marcaba el
--- perfil activo con asterisco.
---
--- Efecto secundario esperado: al quitar la aceleración los movimientos rápidos
--- cubren menos distancia. Lo normal es compensarlo subiendo el DPI en el propio
--- ratón, no la sensibilidad de aquí.
-hl.config({
-  input = {
-    accel_profile = "flat",
-  },
-})
