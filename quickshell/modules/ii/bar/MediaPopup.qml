@@ -22,7 +22,14 @@ import Quickshell.Services.Mpris
 StyledPopup {
     id: root
 
-    readonly property MprisPlayer player: MprisController.activePlayer
+    // Se puede fijar QUE reproductor muestra, igual que en Media.qml. Por
+    // defecto el activo, o sea el comportamiento de siempre.
+    //
+    // Hace falta porque el detalle al hover se quedaba con `activePlayer`, que
+    // sigue a lo ULTIMO que sono: la barra ensenaba Spotify y el popup, al
+    // pasar el raton, ensenaba el video de YouTube que sonó por ultima vez.
+    property MprisPlayer reproductorFijo: null
+    readonly property MprisPlayer player: reproductorFijo ?? MprisController.activePlayer
     readonly property bool hasPlayer: root.player !== null
     readonly property list<MprisPlayer> players: MprisController.players
 

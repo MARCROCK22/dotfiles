@@ -33,5 +33,8 @@ MouseArea {
 
     MediaPopup {
         hoverTarget: root
+        // El popup tiene que ensenar el MISMO reproductor que la isla; si no,
+        // la barra pone Spotify y el detalle al hover otra cosa.
+        reproductorFijo: root.reproductorFijo
     }
 }

@@ -90,39 +90,26 @@ Item {
         spacing: 4
         anchors.fill: parent
 
-        // QUINTO cambio sobre end-4: el icono de la APLICACION -Spotify- en
-        // vez del glifo generico de pausa. El anillo de progreso se queda:
-        // sigue marcando por donde va la cancion, que el icono no dice.
+        // QUINTO cambio sobre end-4: el icono de la APLICACION -Spotify- y
+        // nada mas. Antes habia un anillo de progreso con un glifo generico de
+        // pausa dentro; se retiro el anillo a peticion.
         //
-        // El icono va FUERA del ClippedFilledCircularProgress y superpuesto,
-        // no dentro. Dentro no se veia: ese componente recorta su contenido con
-        // una mascara, y eso mata a un Kirigami.Icon aunque el glifo de texto
-        // que habia antes si sobreviviera. Se perdio un rato buscandolo en el
-        // tamano y en la ruta, que estaban bien -el diagnostico daba
-        // `image://icon/spotify-launcher`, correcto-.
+        // Adivinar el icono por el nombre NO funciona con Spotify: el icono no
+        // se llama «spotify» sino «spotify-launcher», y esa correspondencia
+        // solo la conoce la entrada .desktop. Ver `rutaIcono` arriba.
         Item {
             Layout.alignment: Qt.AlignVCenter
-            implicitWidth: 20
-            implicitHeight: 20
-
-            ClippedFilledCircularProgress {
-                id: mediaCircProg
-                anchors.fill: parent
-                lineWidth: Appearance.rounding.unsharpen
-                value: activePlayer?.position / activePlayer?.length
-                implicitSize: 20
-                colPrimary: Appearance.colors.colOnSecondaryContainer
-                enableAnimation: false
-            }
+            implicitWidth: 18
+            implicitHeight: 18
 
             AppIcon {
                 id: iconoApp
                 anchors.centerIn: parent
                 // Se mira si la RUTA resolvio, no el `status`: AppIcon es un
                 // Kirigami.Icon, no un Image, asi que comparar contra
-                // Image.Ready dejaba el anillo sin icono Y sin reserva.
+                // Image.Ready dejaba el hueco sin icono Y sin reserva.
                 visible: root.rutaIcono !== ""
-                implicitSize: 13
+                implicitSize: 18
                 source: root.rutaIcono
             }
 
