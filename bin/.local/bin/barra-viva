@@ -1,0 +1,294 @@
+#!/usr/bin/env python3
+"""Vuelve a levantar la barra (quickshell) si se cae sola.
+
+Por que existe (20260830): cerrar Sober (Roblox) mato la barra. El registro de
+la instancia muerta lo cuenta entero, en tres lineas seguidas:
+
+    ToplevelHandle(0x7f9ab6780540) closed        <- la ventana ya no existe
+    Creating buffer from request at 1904x1024    <- ...y aun asi le pide una foto
+    closelayer>>quickshell:bar                   <- Hyprland lo expulsa
+
+quickshell pidio una captura de una ventana que ya le habian avisado de que
+estaba cerrada. Eso en Wayland es hablar mal, y el compositor corta al cliente
+sin mas. Cuadra al milisegundo con la muerte de Sober:
+
+    23:36:56.016  Hyprland: error in client communication (pid 1081)
+    23:36:56.126  systemd: Sober scope terminado
+
+NO es un segfault: no deja volcado. Es una expulsion. Por eso no sirve de nada
+buscarlo en coredumpctl.
+
+Quien pide la foto es el overview: con el dock apagado es lo unico que retrata
+ventanas en vivo, y los 1904x1024 son una ventana con los huecos y la barra
+descontados, no la pantalla (1920x1080).
+
+Sober lo provoca mejor que nadie porque no se cierra, se muere: al cerrar la
+ventana del juego el proceso revienta (vinegarhq/sober#1867), y una ventana que
+desaparece de golpe es justo lo que abre la carrera.
+
+Por que un vigilante y no un arreglo: la carrera esta dentro del codigo
+compilado de quickshell, no en el QML, asi que desde la configuracion no hay
+parche posible. Y no se puede actualizar a la 0.3.1 (que arregla varias cosas
+del ciclo de vida de las ventanas al cerrarse) porque end-4 clava a mano el
+commit: el paquete se llama, literalmente, "pinned commit".
+
+NO SONDEA. Se cuelga de un pidfd y es el kernel quien lo despierta cuando el
+proceso muere. Mientras tanto gasta cero.
+
+NO PELEA CON NADIE. Si la barra muere y vuelve sola en unos segundos --una
+recarga a mano, un `pkill -x qs` y relanzar-- se limita a re-engancharse.
+
+Y SI SE CAE UNA Y OTRA VEZ, SE RINDE. Un bucle de reinicio sin freno deja la
+pantalla parpadeando y es peor que no tener barra.
+
+Cada caida real deja copia del registro de la instancia muerta en
+~/.local/state/barra-viva/, que es la prueba que hace falta para reportarlo
+arriba y que de otro modo se pierde al reiniciar.
+"""
+import fcntl
+import os
+import select
+import shutil
+import subprocess
+import sys
+import time
+from datetime import datetime
+
+XDG = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+
+# La misma orden que lanza end-4 en hyprland/execs.lua. `qsConfig` la exporta
+# hyprland/variables.lua; si no estuviera, "ii" es el valor de siempre.
+CONFIG = os.environ.get("qsConfig") or "ii"
+ORDEN = ["qs", "-c", CONFIG]
+
+CERROJO = f"{XDG}/barra-viva.lock"
+ESTADO = os.path.expanduser("~/.local/state/barra-viva")
+REGISTRO = os.path.expanduser("~/.local/state/barra-viva.log")
+
+# Subordenes de `qs` que NO son la barra. Importa: los vigilantes del
+# portapapeles lanzan `qs -c ii ipc call ...` a cada copia, y confundir uno de
+# esos con la barra haria creer que se murio cada vez que copias texto.
+SUBORDENES = {"ipc", "log", "kill", "list", "msg", "help"}
+
+# Tras una muerte se espera esto por si la barra vuelve sola. Si vuelve, es que
+# alguien la reinicio a mano y aqui no hay nada que hacer.
+GRACIA_S = 4.0
+
+# En el arranque la barra la lanza end-4, no nosotros, y puede tardar en
+# aparecer. Esta espera es puntual, solo al inicio.
+ESPERA_INICIAL_S = 60.0
+PASO_INICIAL_S = 0.5
+
+# El freno.
+MAX_REINICIOS = 4
+VENTANA_S = 180.0
+
+# Lo que tarda la barra en levantar el servicio de notificaciones. Antes de eso
+# notify-send no llega a nadie, porque el demonio de notificaciones ES la barra.
+ESPERA_NOTIFICAR_S = 5.0
+
+# Copias de registros de caidas que se guardan. Cada una ronda el mega.
+MAX_COPIAS = 5
+
+
+def registrar(mensaje):
+    linea = f"{datetime.now():%Y-%m-%d %H:%M:%S}  {mensaje}\n"
+    try:
+        os.makedirs(os.path.dirname(REGISTRO), exist_ok=True)
+        with open(REGISTRO, "a") as f:
+            f.write(linea)
+    except OSError:
+        pass
+    sys.stderr.write(linea)
+    sys.stderr.flush()
+
+
+def pid_barra():
+    """PID de la barra, o None.
+
+    Se compara la orden entera y no solo el nombre: `qs log ...` y
+    `qs -c ii ipc call ...` tambien se llaman qs y no son la barra.
+    """
+    yo = os.getuid()
+    for entrada in os.listdir("/proc"):
+        if not entrada.isdigit():
+            continue
+        try:
+            if os.stat(f"/proc/{entrada}").st_uid != yo:
+                continue
+            with open(f"/proc/{entrada}/cmdline", "rb") as f:
+                argv = f.read().split(b"\0")[:-1]
+        except OSError:
+            continue
+        if not argv:
+            continue
+        partes = [a.decode(errors="replace") for a in argv]
+        if os.path.basename(partes[0]) != "qs":
+            continue
+        if SUBORDENES & set(partes[1:]):
+            continue
+        if "-c" not in partes[1:] and "-p" not in partes[1:]:
+            continue
+        return int(entrada)
+    return None
+
+
+def hyprland_vivo():
+    firma = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")
+    return bool(firma) and os.path.isdir(f"{XDG}/hypr/{firma}")
+
+
+def esperar_muerte(pid):
+    """Se bloquea hasta que el proceso muera.
+
+    El pidfd se vuelve legible en cuanto el proceso termina, sea hijo nuestro o
+    no. Nos despierta el kernel: aqui no se sondea nada.
+    """
+    try:
+        fd = os.pidfd_open(pid)
+    except (OSError, ProcessLookupError):
+        return  # ya estaba muerto
+    try:
+        select.select([fd], [], [])
+    finally:
+        os.close(fd)
+
+
+def guardar_prueba(pid):
+    """Copia el registro de la instancia muerta antes de que se pierda.
+
+    quickshell deja el suyo en /run/user, que se vacia al reiniciar. Es
+    justamente el que hace falta para reportar el fallo arriba.
+    """
+    origen = f"{XDG}/quickshell/by-pid/{pid}/log.qslog"
+    if not os.path.exists(origen):
+        return None
+    try:
+        os.makedirs(ESTADO, exist_ok=True)
+        destino = f"{ESTADO}/caida-{datetime.now():%Y%m%d-%H%M%S}.qslog"
+        shutil.copy2(origen, destino)
+    except OSError as e:
+        registrar(f"no se pudo guardar la prueba: {e}")
+        return None
+
+    viejas = sorted(f for f in os.listdir(ESTADO) if f.endswith(".qslog"))
+    for f in viejas[:-MAX_COPIAS]:
+        try:
+            os.unlink(f"{ESTADO}/{f}")
+        except OSError:
+            pass
+    return destino
+
+
+def avisar(urgencia, titulo, cuerpo):
+    if not shutil.which("notify-send"):
+        return
+    try:
+        subprocess.run(
+            ["notify-send", "-a", "Barra", "-u", urgencia, titulo, cuerpo],
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
+def lanzar():
+    # start_new_session: que no se lleve por delante a la barra si a este
+    # proceso le llega un Ctrl-C o el grupo entero recibe una senal.
+    return subprocess.Popen(
+        ORDEN,
+        start_new_session=True,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def esperar_barra_inicial():
+    limite = time.monotonic() + ESPERA_INICIAL_S
+    while time.monotonic() < limite:
+        pid = pid_barra()
+        if pid is not None:
+            return pid
+        if not hyprland_vivo():
+            return None
+        time.sleep(PASO_INICIAL_S)
+    return None
+
+
+def main():
+    # Cerrojo de instancia unica. `hyprland.start` no se dispara en las
+    # recargas, asi que un `hyprctl reload` no duplica esto, pero el cerrojo
+    # cubre el caso de lanzarlo tambien a mano.
+    cerrojo = open(CERROJO, "w")
+    try:
+        fcntl.flock(cerrojo, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        sys.stderr.write("barra-viva: ya hay otro vigilando\n")
+        return 0
+
+    if not hyprland_vivo():
+        sys.stderr.write("barra-viva: esto no es una sesion de Hyprland\n")
+        return 1
+
+    pid = esperar_barra_inicial()
+    if pid is None:
+        registrar("no aparecio ninguna barra en el arranque; no hay nada que vigilar")
+        return 1
+    registrar(f"vigilando la barra (pid {pid}, orden: {' '.join(ORDEN)})")
+
+    hijo = None
+    reinicios = []
+
+    while True:
+        esperar_muerte(pid)
+        if hijo is not None:
+            hijo.poll()  # recoger al hijo muerto
+
+        if not hyprland_vivo():
+            registrar("Hyprland ya no esta; me voy con la sesion")
+            return 0
+
+        # Si vuelve sola dentro de la gracia, la reinicio alguien a proposito.
+        time.sleep(GRACIA_S)
+        de_vuelta = pid_barra()
+        if de_vuelta is not None:
+            registrar(f"la barra volvio sola (pid {de_vuelta}); re-enganchando")
+            pid, hijo = de_vuelta, None
+            continue
+
+        if not hyprland_vivo():
+            registrar("Hyprland ya no esta; me voy con la sesion")
+            return 0
+
+        ahora = time.monotonic()
+        reinicios = [t for t in reinicios if ahora - t < VENTANA_S]
+        if len(reinicios) >= MAX_REINICIOS:
+            registrar(f"{len(reinicios)} caidas en menos de {VENTANA_S:.0f}s; me rindo")
+            avisar(
+                "critical",
+                "La barra no se mantiene",
+                f"Se ha caido {len(reinicios)} veces seguidas. Dejo de reintentar.\n"
+                f"Detalles en {REGISTRO}",
+            )
+            return 1
+        reinicios.append(ahora)
+
+        prueba = guardar_prueba(pid)
+        registrar(
+            f"la barra (pid {pid}) se cayo sola; levantandola"
+            + (f" - prueba en {prueba}" if prueba else "")
+        )
+
+        hijo = lanzar()
+        pid = hijo.pid
+        time.sleep(ESPERA_NOTIFICAR_S)
+        avisar("low", "Barra recuperada", "Se cayo sola y la he vuelto a levantar.")
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(0)

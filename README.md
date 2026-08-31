@@ -13,7 +13,7 @@ Este repo contiene **solo lo que va encima de end-4**, no end-4 entero.
 | `quickshell/` | Archivos **enteros** del shell de end-4, con sus hashes en `MANIFEST`. No son enlaces de stow: los copia `install.py` |
 | `patches/` | Legado de la v14, cuando esto eran diffs. Ya no lo usa nada — se puede borrar |
 | `alacritty/` | Terminal |
-| `bin/` | Scripts propios: `recorder` (grabación de pantalla), `reparar-pantallas` (recupera el DisplayPort cuando despierta sin EDID) y `casco-bateria` (dice la carga del G733 al pulsar su botón) |
+| `bin/` | Scripts propios: `recorder` (grabación de pantalla), `reparar-pantallas` (recupera el DisplayPort cuando despierta sin EDID), `casco-bateria` (dice la carga del G733 al pulsar su botón) y `barra-viva` (vuelve a levantar la barra si quickshell se cae) |
 | `fish/` | Shell |
 | `fastfetch/` | Resumen del sistema al abrir la terminal |
 | `starship/` | Prompt |
@@ -118,6 +118,17 @@ actualización de Hyprland hay que repetirlo o el plugin deja de cargar.
   modo híbrido, con la sesión en la Intel, no interviene.
 - **`prime-run`**: en portátiles con gráficos híbridos, los juegos necesitan
   `prime-run %command%` en las opciones de lanzamiento de Steam.
+- **quickshell se cae solo al cerrar ventanas.** Pide una captura de una ventana
+  que ya se cerró; eso en Wayland es un error de protocolo y Hyprland expulsa al
+  cliente. No deja volcado, así que no aparece en `coredumpctl`. Lo dispara el
+  overview (es lo único que retrata ventanas en vivo con el dock apagado) y
+  Sober/Roblox es quien mejor lo provoca, porque al cerrar la ventana el proceso
+  revienta ([sober#1867](https://github.com/vinegarhq/sober/issues/1867)).
+  La carrera está en el código compilado de quickshell, no en el QML: **desde la
+  configuración no hay parche**. De ahí `barra-viva`. La 0.3.1 arregla varias
+  cosas del ciclo de vida de las ventanas y podría valer, pero end-4 clava el
+  commit a mano (`illogical-impulse-quickshell-git` = *"pinned commit"*), así
+  que actualizar significa saltarse el clavo y arriesgar la configuración.
 
 ## Migración al PC de escritorio (dual boot con Windows)
 
