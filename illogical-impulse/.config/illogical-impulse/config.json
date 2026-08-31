@@ -386,7 +386,8 @@
         "useHyprlock": false
     },
     "media": {
-        "filterDuplicatePlayers": true
+        "filterDuplicatePlayers": true,
+        "showArtist": false
     },
     "musicRecognition": {
         "interval": 4,
