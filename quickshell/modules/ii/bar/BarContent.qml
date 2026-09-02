@@ -265,16 +265,30 @@ Item { // Bar content region
         // comprobaciones parecidas: es lo unico que garantiza que no se vean
         // las dos a la vez ni ninguna.
         //
-        // El tope es un tercio del ancho de la barra, FIJO y sin depender del
-        // ancho vivo de los lados. Atarlo a los lados fue un intento anterior y
-        // se veia fatal: los numeros de los anillos cambian a cada lectura, asi
-        // que esto se redimensionaba constantemente y la barra parecia respirar.
+        // El tope sale de lo que de verdad queda libre, no de un porcentaje.
         //
-        // Y con el tope no puede pisar nada, pase lo que pase con el titulo:
-        // las dos mitades estan ancladas a los bordes de ESTE item, asi que lo
-        // que ocupa aqui se lo restan ellas, nunca al reves. Si el contenido no
-        // cabe, se queda con el tope y el texto recorta o desliza dentro.
-        implicitWidth: Math.min(contenidoCentral.implicitWidth, root.width * 0.34)
+        // Un tercio fijo (lo de antes) se pasaba: medido con barra de 1920, la
+        // derecha pide 677 y la izquierda 433, pero el centro esta clavado al
+        // centro GEOMETRICO, asi que el sobrante se parte por igual y cada lado
+        // recibia 633. A la derecha le faltaban 44 px y se desbordaba hacia la
+        // izquierda por encima del titulo, mientras la izquierda desperdiciaba
+        // 201. Ese era el bug: no lo causaba el titulo por ser largo, sino el
+        // reparto ciego.
+        //
+        // Como esta centrado, su media anchura no puede pasar de la distancia
+        // del centro al lado mas ancho. De ahi el `max` y el x2. El hueco de
+        // aire evita que el texto quede pegado a los anillos.
+        //
+        // Atarlo a los lados se habia descartado por miedo a que la barra
+        // "respirara" al cambiar los numeros de los anillos. Medido antes de
+        // rehacerlo: en 120 lecturas seguidas la derecha pidio 677 las 120
+        // veces, y la izquierda oscila 1 px por el reloj, que ni se acerca al
+        // maximo. No respira.
+        readonly property real aire: 12
+        implicitWidth: Math.min(contenidoCentral.implicitWidth, Math.max(0,
+            root.width - 2 * Math.max(leftSectionRowLayout.implicitWidth,
+                                      rightSectionRowLayout.implicitWidth)
+                       - 2 * aire))
 
         Item {
             id: contenidoCentral
